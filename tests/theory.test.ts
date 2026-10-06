@@ -96,3 +96,17 @@ describe('theory', () => {
     expect(partialDecayRate(2, 1, 0.5, 0.01)).toBeCloseTo(0.5 + 0.01 * (2 * Math.PI) ** 2, 12);
   });
 });
+
+describe('parameter limits from the stability bound', () => {
+  it('maxKappa and maxSigma1 sit exactly on the minimum-grid boundary', async () => {
+    const { MIN_POINTS, maxKappa, maxSigma1, stabilityBound } =
+      await import('../src/physics/grid.ts');
+    const L = 0.648;
+    const c = 427;
+    const fs = 48000;
+    const kappa = maxKappa(L, c, 0.001, fs);
+    expect(stabilityBound(c, kappa, 0.001, 1 / fs)).toBeCloseTo(L / MIN_POINTS, 12);
+    const s1 = maxSigma1(L, c, 0.5, fs);
+    expect(stabilityBound(c, 0.5, s1, 1 / fs)).toBeCloseTo(L / MIN_POINTS, 12);
+  });
+});

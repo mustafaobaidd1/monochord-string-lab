@@ -29,11 +29,11 @@ export interface Grid {
   hMin: number;
   /** Courant number lambda = c k / h. */
   lambda: number;
-  /** Stiffness number mu = kappa k / h^2. */
-  mu: number;
+  /** Stiffness number nu = kappa k / h^2 (Bilbao writes mu; nu avoids a clash with linear density). */
+  nu: number;
   /** True when N was capped at `MAX_POINTS` (the grid is coarser than the bound allows). */
   capped: boolean;
-  /** Left-hand side of the stability inequality, lambda^2 + 4 mu^2 + 4 sigma_1 k / h^2 (<= 1). */
+  /** Left-hand side of the stability inequality, lambda^2 + 4 nu^2 + 4 sigma_1 k / h^2 (<= 1). */
   stabilityNumber: number;
 }
 
@@ -73,15 +73,35 @@ export function designGrid(input: GridInput, maxPoints = MAX_POINTS): Grid {
   const N = Math.min(stable, maxPoints);
   const h = L / N;
   const lambda = (c * k) / h;
-  const mu = (kappa * k) / (h * h);
+  const nu = (kappa * k) / (h * h);
   return {
     N,
     h,
     k,
     hMin,
     lambda,
-    mu,
+    nu,
     capped: stable > maxPoints,
-    stabilityNumber: lambda * lambda + 4 * mu * mu + (4 * sigma1 * k) / (h * h),
+    stabilityNumber: lambda * lambda + 4 * nu * nu + (4 * sigma1 * k) / (h * h),
   };
+}
+
+/**
+ * Largest stiffness kappa for which a grid of at least `MIN_POINTS` intervals is still stable:
+ * from h^4 - a h^2 - 4 kappa^2 k^2 >= 0 with h = L / MIN_POINTS and a = c^2 k^2 + 4 sigma_1 k.
+ */
+export function maxKappa(length: number, c: number, sigma1: number, sampleRate: number): number {
+  const k = 1 / sampleRate;
+  const h = length / MIN_POINTS;
+  const a = c * c * k * k + 4 * sigma1 * k;
+  const v = h * h * (h * h - a);
+  return v > 0 ? Math.sqrt(v) / (2 * k) : 0;
+}
+
+/** Largest sigma_1 for which a grid of at least `MIN_POINTS` intervals is still stable. */
+export function maxSigma1(length: number, c: number, kappa: number, sampleRate: number): number {
+  const k = 1 / sampleRate;
+  const h = length / MIN_POINTS;
+  const a = (h ** 4 - 4 * kappa * kappa * k * k) / (h * h);
+  return Math.max(0, (a - c * c * k * k) / (4 * k));
 }

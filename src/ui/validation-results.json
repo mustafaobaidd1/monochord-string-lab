@@ -1,0 +1,206 @@
+{
+  "generated": "2026-10-06",
+  "sampleRate": 48000,
+  "maxPoints": 640,
+  "fundamental": [
+    {
+      "target": 82.4069,
+      "measured": 82.4069,
+      "cents": 0
+    },
+    {
+      "target": 196,
+      "measured": 195.99996,
+      "cents": -0.0004
+    },
+    {
+      "target": 329.6276,
+      "measured": 329.62702,
+      "cents": -0.003
+    },
+    {
+      "target": 440,
+      "measured": 439.99876,
+      "cents": -0.0049
+    }
+  ],
+  "partials": [
+    {
+      "preset": "Piano A0",
+      "B": 0.0002087879869085743,
+      "N": 298,
+      "maxVsContinuous": 0.723,
+      "maxVsDiscrete": 0.0001,
+      "dispersionAt10": -0.723,
+      "stretch10": 17.89,
+      "measuredStretch10": 17.16
+    },
+    {
+      "preset": "Bass guitar E1",
+      "B": 0.0004299926523733359,
+      "N": 203,
+      "maxVsContinuous": 1.581,
+      "maxVsDiscrete": 0.0002,
+      "dispersionAt10": -1.581,
+      "stretch10": 36.44,
+      "measuredStretch10": 34.86
+    },
+    {
+      "preset": "Guitar E2",
+      "B": 0.00014653825112072495,
+      "N": 174,
+      "maxVsContinuous": 1.536,
+      "maxVsDiscrete": 0,
+      "dispersionAt10": -1.536,
+      "stretch10": 12.59,
+      "measuredStretch10": 11.06
+    }
+  ],
+  "third": {
+    "rows": [
+      {
+        "n": 3,
+        "belowNeighbours": 110.6
+      },
+      {
+        "n": 6,
+        "belowNeighbours": 119
+      },
+      {
+        "n": 9,
+        "belowNeighbours": 111.9
+      }
+    ],
+    "minimum": 110.6
+  },
+  "energy": [
+    {
+      "preset": "Guitar E2",
+      "drift": 4.982338635326872e-13
+    },
+    {
+      "preset": "Guitar E4",
+      "drift": 1.6773722277042653e-13
+    },
+    {
+      "preset": "Classical nylon",
+      "drift": 1.9448293534668206e-13
+    },
+    {
+      "preset": "Bass guitar E1",
+      "drift": 4.56951605440905e-13
+    },
+    {
+      "preset": "Piano A0",
+      "drift": 7.315543680772915e-13
+    },
+    {
+      "preset": "Harp C4",
+      "drift": 1.1230558737961705e-13
+    },
+    {
+      "preset": "Violin pizzicato",
+      "drift": 9.15151048439366e-14
+    }
+  ],
+  "decay": {
+    "sigma0": 1.3,
+    "measured": 1.3,
+    "relError": 0
+  },
+  "stability": [
+    {
+      "preset": "Guitar E2",
+      "N": 173,
+      "stabilityNumber": 0.9825,
+      "hOverHmin": 1.005397,
+      "maxOverInitial": 0.998,
+      "msPerSecond": 23.6
+    },
+    {
+      "preset": "Guitar E4",
+      "N": 71,
+      "stabilityNumber": 0.9808,
+      "hOverHmin": 1.009459,
+      "maxOverInitial": 0.992,
+      "msPerSecond": 9.7
+    },
+    {
+      "preset": "Classical nylon",
+      "N": 69,
+      "stabilityNumber": 0.9897,
+      "hOverHmin": 1.004791,
+      "maxOverInitial": 0.984,
+      "msPerSecond": 9.8
+    },
+    {
+      "preset": "Bass guitar E1",
+      "N": 203,
+      "stabilityNumber": 0.9967,
+      "hOverHmin": 1.000879,
+      "maxOverInitial": 1,
+      "msPerSecond": 30.6
+    },
+    {
+      "preset": "Piano A0",
+      "N": 298,
+      "stabilityNumber": 0.9947,
+      "hOverHmin": 1.001425,
+      "maxOverInitial": 1,
+      "msPerSecond": 43.5
+    },
+    {
+      "preset": "Harp C4",
+      "N": 74,
+      "stabilityNumber": 0.9985,
+      "hOverHmin": 1.000547,
+      "maxOverInitial": 0.99,
+      "msPerSecond": 10.7
+    },
+    {
+      "preset": "Violin pizzicato",
+      "N": 49,
+      "stabilityNumber": 0.9763,
+      "hOverHmin": 1.010367,
+      "maxOverInitial": 0.979,
+      "msPerSecond": 9.7
+    }
+  ],
+  "hammer": [
+    {
+      "preset": "Guitar E2",
+      "contactMs": 6.23,
+      "drift": 3.511851303588602e-13
+    },
+    {
+      "preset": "Guitar E4",
+      "contactMs": 4.85,
+      "drift": 4.799401616869166e-13
+    },
+    {
+      "preset": "Classical nylon",
+      "contactMs": 4.75,
+      "drift": 7.409196712949829e-13
+    },
+    {
+      "preset": "Bass guitar E1",
+      "contactMs": 7.75,
+      "drift": 6.688322735155022e-14
+    },
+    {
+      "preset": "Piano A0",
+      "contactMs": 5.58,
+      "drift": 3.2842415655729634e-13
+    },
+    {
+      "preset": "Harp C4",
+      "contactMs": 4.15,
+      "drift": 2.3232444774563456e-13
+    },
+    {
+      "preset": "Violin pizzicato",
+      "contactMs": 4,
+      "drift": 1.9178331762188033e-13
+    }
+  ]
+}

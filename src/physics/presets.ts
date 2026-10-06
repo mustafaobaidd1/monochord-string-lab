@@ -42,6 +42,8 @@ export interface StrikeSettings {
 export interface Preset {
   id: string;
   name: string;
+  /** Compact label for the preset chips (the note is shown next to it). */
+  short: string;
   /** Short description of the string (gauge, construction, scale). */
   detail: string;
   /** Equal-tempered note the tension is tuned to. */
@@ -83,6 +85,7 @@ export const PRESETS: readonly Preset[] = [
   {
     id: 'guitar-e2',
     name: 'Guitar E2',
+    short: 'Guitar',
     detail: 'wound steel · 0.046″ · 25.5″ scale',
     note: 'E2',
     frequency: 82.4069,
@@ -100,6 +103,7 @@ export const PRESETS: readonly Preset[] = [
   {
     id: 'guitar-e4',
     name: 'Guitar E4',
+    short: 'Guitar',
     detail: 'plain steel · 0.010″ · 25.5″ scale',
     note: 'E4',
     frequency: 329.6276,
@@ -117,6 +121,7 @@ export const PRESETS: readonly Preset[] = [
   {
     id: 'nylon-e4',
     name: 'Classical nylon',
+    short: 'Nylon',
     detail: 'nylon E4 · 0.71 mm · 650 mm scale',
     note: 'E4',
     frequency: 329.6276,
@@ -134,6 +139,7 @@ export const PRESETS: readonly Preset[] = [
   {
     id: 'bass-e1',
     name: 'Bass guitar E1',
+    short: 'Bass',
     detail: 'wound steel · 0.100″ · 34″ scale',
     note: 'E1',
     frequency: 41.2034,
@@ -141,7 +147,10 @@ export const PRESETS: readonly Preset[] = [
     material: 'wound',
     diameter: 0.1 * INCH,
     density: 6015,
-    source: "D'Addario XLB100: 34.7 lb at E1 on a 34″ long scale (sets the effective density)",
+    // Core fraction assumed (about a third of the outer diameter); not taken from a datasheet.
+    coreRatio: 0.33,
+    source:
+      "D'Addario XLB100: 34.7 lb at E1 on a 34″ long scale (sets the effective density); core fraction 0.33 assumed",
     decay: { f1: 41.2, t1: 9, f2: 1000, t2: 1.4 },
     excitation: 'pluck',
     pluck: { fromBridge: 0.15, width: 0.01, amplitude: 0.003 },
@@ -152,6 +161,7 @@ export const PRESETS: readonly Preset[] = [
   {
     id: 'piano-a0',
     name: 'Piano A0',
+    short: 'Piano',
     detail: 'copper-wound steel · 1.35 m · lowest key',
     note: 'A0',
     frequency: 27.5,
@@ -181,6 +191,7 @@ export const PRESETS: readonly Preset[] = [
   {
     id: 'harp-c4',
     name: 'Harp C4',
+    short: 'Harp',
     detail: 'gut · 1.45 mm · 550 mm',
     note: 'C4',
     frequency: 261.6256,
@@ -198,6 +209,7 @@ export const PRESETS: readonly Preset[] = [
   {
     id: 'violin-a4',
     name: 'Violin pizzicato',
+    short: 'Violin pizz.',
     detail: 'gut A4 · 0.80 mm · 328 mm',
     note: 'A4',
     frequency: 440,

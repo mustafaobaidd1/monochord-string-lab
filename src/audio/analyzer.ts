@@ -43,12 +43,14 @@ export interface Snapshot {
   tag: number;
   fundamental: Peak | null;
   partials: PartialReading[];
+  /** Spectrum of the analysed segment (Blackman-Harris, zero-padded). */
+  spectrum: Spectrum;
   windowSeconds: number;
 }
 
 const RING = 1 << 17;
 export const LIVE_FFT = 16384;
-export const ROW_FFT = 4096;
+export const ROW_FFT = 16384;
 
 export class Analyzer {
   readonly sampleRate: number;
@@ -59,8 +61,8 @@ export class Analyzer {
   private context: AnalysisContext | null = null;
   private lastRowFrame = 0;
   private readonly rowHop: number;
-  private readonly rowWindow = makeWindow('hann', ROW_FFT);
-  private readonly liveWindow = makeWindow('hann', LIVE_FFT);
+  private readonly rowWindow = makeWindow('blackman-harris', ROW_FFT);
+  private readonly liveWindow = makeWindow('blackman-harris', LIVE_FFT);
   private quietFrames = 0;
   /** True when new samples arrived since the last live spectrum. */
   dirty = false;
@@ -157,7 +159,7 @@ export class Analyzer {
     }
   }
 
-  /** Spectrum of the most recent `LIVE_FFT` samples (Hann window, zero-padded x2). */
+  /** Spectrum of the most recent `LIVE_FFT` samples (Blackman-Harris window, zero-padded x2). */
   liveSpectrum(): Spectrum {
     this.dirty = false;
     const x = this.read(this.writeFrame, LIVE_FFT);
@@ -235,5 +237,5 @@ export function analyseSegment(
     );
     r.predictedSuppressed = pn > 0 && pa < pn * 1e-3;
   }
-  return { tag: context.tag, fundamental, partials: readings };
+  return { tag: context.tag, fundamental, partials: readings, spectrum: s };
 }

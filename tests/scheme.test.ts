@@ -264,7 +264,7 @@ describe('stability', () => {
       N,
       h,
       lambda: (sim.physics.c * unstable.k) / h,
-      mu: (sim.physics.kappa * unstable.k) / (h * h),
+      nu: (sim.physics.kappa * unstable.k) / (h * h),
     };
     expect(grid.h).toBeLessThan(grid.hMin);
     const unstableSim = { ...sim, grid, string: new StiffString(params, sim.physics, grid) };

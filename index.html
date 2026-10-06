@@ -4,21 +4,350 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Monochord — the physics of a vibrating string</title>
-    <meta name="description" content="Pluck, strike and hear a physically modelled string, and see why pluck position, stiffness and damping change its sound." />
+    <meta
+      name="description"
+      content="Pluck, strike and hear a physically modelled string, and see why pluck position, stiffness and damping change its sound."
+    />
     <meta name="author" content="Mustafa Obaid" />
-    <meta name="theme-color" content="#111111" />
+    <meta name="theme-color" content="#f3eadb" />
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
 
     <meta property="og:type" content="website" />
     <meta property="og:title" content="Monochord — the physics of a vibrating string" />
-    <meta property="og:description" content="Pluck, strike and hear a physically modelled string, and see why pluck position, stiffness and damping change its sound." />
+    <meta
+      property="og:description"
+      content="Pluck, strike and hear a physically modelled string, and see why pluck position, stiffness and damping change its sound."
+    />
     <meta property="og:url" content="https://mustafaobaidd1.github.io/monochord-string-lab/" />
-    <meta property="og:image" content="https://mustafaobaidd1.github.io/monochord-string-lab/og-image.png" />
+    <meta
+      property="og:image"
+      content="https://mustafaobaidd1.github.io/monochord-string-lab/og-image.png"
+    />
     <meta name="twitter:card" content="summary_large_image" />
   </head>
   <body>
+    <a class="skip-link" href="#controls">Skip to the controls</a>
+    <header class="topbar">
+      <a class="topbar-home" href="https://mustafaobaidd1.github.io/">
+        <span aria-hidden="true">←</span> Mustafa Obaid · Portfolio
+      </a>
+      <nav class="topbar-nav" aria-label="Project">
+        <a href="#how">How it works</a>
+        <a href="https://github.com/mustafaobaidd1/monochord-string-lab">Source code</a>
+      </nav>
+    </header>
+
+    <main>
+      <section class="stage" id="stage" aria-labelledby="title">
+        <canvas class="stage-canvas" id="string-canvas" aria-hidden="true"></canvas>
+        <div class="stage-head">
+          <div class="title-block">
+            <p class="kicker">Plate I · physical model of a stiff, damped string</p>
+            <h1 id="title">Monochord</h1>
+            <p class="lede">
+              Pluck the string and listen. The spectrum shows which partials the pluck point
+              silences, and how a stiff string stretches its partials out of tune.
+            </p>
+          </div>
+          <div class="stage-side">
+            <dl class="spec-block" aria-label="Current string">
+              <div class="spec-row spec-row--wide">
+                <dt>String</dt>
+                <dd id="spec-string">Guitar E2 · wound steel 0.046″</dd>
+              </div>
+              <div class="spec-row">
+                <dt><span class="sym">f</span><sub>1</sub> measured</dt>
+                <dd><output id="f0-readout" data-measured-f0="">—</output></dd>
+              </div>
+              <div class="spec-row">
+                <dt><span class="sym">f</span><sub>0</sub> predicted</dt>
+                <dd id="spec-f0">82.41 Hz</dd>
+              </div>
+              <div class="spec-row">
+                <dt>Inharmonicity <span class="sym">B</span></dt>
+                <dd id="spec-b">—</dd>
+              </div>
+            </dl>
+          </div>
+        </div>
+        <div class="stage-band" id="string-band">
+          <div
+            class="string-target"
+            id="string-target"
+            tabindex="0"
+            role="slider"
+            aria-label="Pluck position on the string"
+            aria-describedby="string-help"
+            aria-valuemin="2"
+            aria-valuemax="98"
+            aria-valuenow="20"
+            aria-valuetext="130 mm from the bridge"
+          ></div>
+          <p class="stage-hint" id="stage-hint">
+            <svg viewBox="0 0 64 40" aria-hidden="true">
+              <path d="M6 34 C 20 30, 30 20, 34 6" />
+              <path d="M27 10 L34 5 L37 13" />
+            </svg>
+            <span>Drag the string and let go</span>
+          </p>
+          <p class="visually-hidden" id="string-help">
+            Drag the string vertically with a pointer and release it to pluck. With the keyboard,
+            use the left and right arrows to move the pluck point and Enter or Space to pluck.
+          </p>
+        </div>
+        <div class="stage-foot">
+          <div class="preset-strip" role="radiogroup" aria-label="String preset" id="presets"></div>
+          <div class="stage-tools">
+            <button class="sound-pill" id="sound-pill" type="button" data-status="idle">
+              <svg viewBox="0 0 24 24" aria-hidden="true" class="icon">
+                <path d="M4 9h4l5-4v14l-5-4H4z" />
+                <path class="wave wave-1" d="M16.5 8.5a5 5 0 0 1 0 7" />
+                <path class="wave wave-2" d="M19 6a8.5 8.5 0 0 1 0 12" />
+                <path class="slash" d="M16 9l6 6M22 9l-6 6" />
+              </svg>
+              <span id="sound-label">Enable sound</span>
+            </button>
+            <label class="switch" title="Slow motion">
+              <input type="checkbox" id="slowmo" checked />
+              <span class="switch-track" aria-hidden="true"></span>
+              <span class="switch-label"
+                >Slow<span class="switch-long"> motion</span>
+                <span id="slowmo-factor">×64</span></span
+              >
+            </label>
+            <button class="icon-button" id="pause" type="button" aria-pressed="false">
+              <svg viewBox="0 0 24 24" aria-hidden="true" class="icon">
+                <path class="pause-glyph" d="M8 5v14M16 5v14" />
+                <path class="play-glyph" d="M8 5l11 7-11 7z" />
+              </svg>
+              <span class="visually-hidden" id="pause-label">Pause the animation</span>
+            </button>
+          </div>
+        </div>
+      </section>
+
+      <div class="layout" id="controls">
+        <section class="card card--spectrum" aria-labelledby="spectrum-title">
+          <header class="card-head">
+            <h2 id="spectrum-title">Spectrum</h2>
+            <p class="card-sub">
+              Log frequency. Lines mark the predicted partials
+              <span class="math-inline">n·f<sub>0</sub>·√(1 + Bn²)</span>; the waterfall below shows
+              the last few seconds.
+            </p>
+          </header>
+          <ul class="spectrum-notes" id="spectrum-notes" aria-label="Annotations"></ul>
+          <div class="spectrum-frame">
+            <canvas id="spectrum-canvas" role="img" aria-label="Spectrum and waterfall"></canvas>
+          </div>
+          <ul class="legend" aria-label="Legend">
+            <li><span class="key key--live" aria-hidden="true"></span>Live spectrum</li>
+            <li><span class="key key--snap" aria-hidden="true"></span>At the pluck</li>
+            <li><span class="key key--partial" aria-hidden="true"></span>Predicted partial</li>
+            <li><span class="key key--level" aria-hidden="true"></span>Predicted level</li>
+            <li><span class="key key--missing" aria-hidden="true"></span>Missing partial</li>
+          </ul>
+          <p class="spectrum-status" id="spectrum-status" aria-live="polite"></p>
+        </section>
+
+        <section class="card card--excite" aria-labelledby="excite-title">
+          <header class="card-head">
+            <h2 id="excite-title">Excite</h2>
+            <div class="segmented" role="radiogroup" aria-label="Excitation">
+              <label
+                ><input type="radio" name="excitation" value="pluck" checked /><span
+                  >Pluck</span
+                ></label
+              >
+              <label
+                ><input type="radio" name="excitation" value="strike" /><span>Strike</span></label
+              >
+            </div>
+          </header>
+          <div class="fraction-row">
+            <span class="fraction-label" id="fraction-label">Pluck at</span>
+            <div class="fractions" role="group" aria-labelledby="fraction-label" id="fractions">
+              <button
+                type="button"
+                data-fraction="2"
+                aria-label="One half of the length from the bridge"
+              >
+                <span class="frac"><span>1</span><span>2</span></span>
+              </button>
+              <button
+                type="button"
+                data-fraction="3"
+                aria-label="One third of the length from the bridge"
+              >
+                <span class="frac"><span>1</span><span>3</span></span>
+              </button>
+              <button
+                type="button"
+                data-fraction="4"
+                aria-label="One quarter of the length from the bridge"
+              >
+                <span class="frac"><span>1</span><span>4</span></span>
+              </button>
+              <button
+                type="button"
+                data-fraction="5"
+                aria-label="One fifth of the length from the bridge"
+              >
+                <span class="frac"><span>1</span><span>5</span></span>
+              </button>
+              <button
+                type="button"
+                data-fraction="12"
+                aria-label="One twelfth of the length, near the bridge"
+              >
+                <span class="frac"><span>1</span><span>12</span></span>
+              </button>
+            </div>
+          </div>
+          <div class="excite-panel" id="pluck-panel">
+            <div class="field" data-param="pluck.fromBridge"></div>
+            <div class="field" data-param="pluck.width"></div>
+            <div class="field" data-param="pluck.amplitude"></div>
+          </div>
+          <div class="excite-panel" id="strike-panel" hidden>
+            <div class="field" data-param="strike.fromBridge"></div>
+            <div class="field" data-param="strike.velocity"></div>
+            <div class="field" data-param="strike.mass"></div>
+            <div class="field" data-param="strike.q0"></div>
+            <div class="field" data-param="strike.exponent"></div>
+          </div>
+          <button class="primary" id="excite" type="button">
+            <span id="excite-label">Pluck</span>
+            <kbd aria-hidden="true">Space</kbd>
+          </button>
+          <p class="note" id="excite-note"></p>
+        </section>
+
+        <section class="card card--string" aria-labelledby="string-title">
+          <header class="card-head">
+            <h2 id="string-title">String</h2>
+            <p class="card-sub" id="string-sub">Material, gauge, length and tension.</p>
+          </header>
+          <fieldset class="segmented segmented--wrap" id="material">
+            <legend class="field-label">Material</legend>
+          </fieldset>
+          <div class="field" data-param="string.diameter"></div>
+          <div class="field" data-param="string.length"></div>
+          <div class="field" data-param="string.tension"></div>
+          <dl class="derived" id="derived"></dl>
+        </section>
+
+        <section class="card card--experiments" aria-labelledby="experiments-title">
+          <header class="card-head">
+            <h2 id="experiments-title">Experiments</h2>
+            <p class="card-sub">Stiffness and damping. Sliders re-pluck when you let go.</p>
+          </header>
+          <div class="field" data-param="string.inharmonicity"></div>
+          <p class="tip">
+            A stiff string resists bending, which raises high partials more than low ones. Push B
+            towards 10⁻² and the tone turns bell-like.
+          </p>
+          <div class="field" data-param="string.sigma0"></div>
+          <div class="field" data-param="string.sigma1"></div>
+          <p class="tip" id="t60-readout"></p>
+        </section>
+
+        <section class="card card--listen" aria-labelledby="listen-title">
+          <header class="card-head">
+            <h2 id="listen-title">Listen</h2>
+            <p class="card-sub">What the ear hears: the force on the bridge, or a pickup.</p>
+          </header>
+          <div class="segmented" role="radiogroup" aria-label="Output">
+            <label
+              ><input type="radio" name="output" value="bridge" checked /><span
+                >Bridge force</span
+              ></label
+            >
+            <label><input type="radio" name="output" value="pickup" /><span>Pickup</span></label>
+          </div>
+          <div class="field" data-param="output.pickupFromBridge"></div>
+          <div class="field" data-param="volume"></div>
+          <button class="toggle" id="mute" type="button" aria-pressed="false">
+            <svg viewBox="0 0 24 24" aria-hidden="true" class="icon">
+              <path d="M4 9h4l5-4v14l-5-4H4z" />
+              <path class="slash" d="M16 9l6 6M22 9l-6 6" />
+            </svg>
+            <span>Mute</span>
+          </button>
+          <p class="note" id="listen-note"></p>
+        </section>
+
+        <section class="card card--partials" aria-labelledby="partials-title">
+          <header class="card-head">
+            <h2 id="partials-title">Partials</h2>
+            <p class="card-sub">Measured from the first second after the excitation.</p>
+          </header>
+          <div class="table-scroll">
+            <table class="partials" id="partials">
+              <thead>
+                <tr>
+                  <th scope="col"><span class="sym">n</span></th>
+                  <th scope="col" class="col-predicted">Predicted <span class="unit">Hz</span></th>
+                  <th scope="col">Measured <span class="unit">Hz</span></th>
+                  <th scope="col">
+                    <abbr title="Deviation from the prediction in cents">Δ ¢</abbr>
+                  </th>
+                  <th scope="col">Level <span class="unit">dB</span></th>
+                  <th scope="col">Theory <span class="unit">dB</span></th>
+                </tr>
+              </thead>
+              <tbody id="partials-body"></tbody>
+            </table>
+          </div>
+        </section>
+
+        <section class="card card--keyboard" aria-labelledby="keyboard-title">
+          <header class="card-head">
+            <h2 id="keyboard-title">Play</h2>
+            <p class="card-sub" id="keyboard-sub">
+              Each key retunes the string's tension, T = μ(2Lf)², and plucks it.<span
+                class="desktop-only"
+              >
+                Computer keys: Z–M and Q–U.</span
+              >
+            </p>
+            <div class="octave-switch" role="group" aria-label="Octave">
+              <button type="button" id="octave-down" aria-label="Lower octave">‹</button>
+              <span class="octave-range" id="octave-range" aria-live="polite"></span>
+              <button type="button" id="octave-up" aria-label="Upper octave">›</button>
+            </div>
+          </header>
+          <div class="keyboard" id="keyboard" role="group" aria-label="Keyboard"></div>
+          <p class="note" id="keyboard-note"></p>
+        </section>
+      </div>
+
+      <section class="how" id="how" aria-labelledby="how-title">
+        <header class="how-head">
+          <p class="kicker">Plate II · notes</p>
+          <h2 id="how-title">How it works</h2>
+          <p class="how-lede">
+            The equation, the finite-difference scheme, the validation and the limitations. Loading
+            the typeset equations…
+          </p>
+        </header>
+      </section>
+    </main>
+
+    <footer class="footer">
+      <p>
+        Monochord by Mustafa Obaid ·
+        <a href="https://github.com/mustafaobaidd1/monochord-string-lab">Source code</a> (MIT) ·
+        <a href="https://mustafaobaidd1.github.io/">Portfolio</a>
+      </p>
+      <p class="footer-small">
+        An educational physical-modelling simulation. Fonts: Spectral and Work Sans (SIL OFL).
+        Equations typeset with KaTeX (MIT).
+      </p>
+    </footer>
+
+    <div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
     <noscript>This interactive project needs JavaScript enabled.</noscript>
-    <div id="app"></div>
     <script type="module" src="/src/main.ts"></script>
   </body>
 </html>

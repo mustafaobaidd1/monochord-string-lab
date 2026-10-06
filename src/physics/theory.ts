@@ -9,7 +9,7 @@
  * The discrete scheme has the same eigenvectors, with the exact per-mode characteristic
  * polynomial
  *   (1 + sigma_0 k) z^2 - (2 - a - b) z + (1 - sigma_0 k - b) = 0,
- *   a = 4 lambda^2 s^2 + 16 mu^2 s^4,  b = 8 sigma_1 k s^2 / h^2,  s = sin(p pi / (2N)),
+ *   a = 4 lambda^2 s^2 + 16 nu^2 s^4,  b = 8 sigma_1 k s^2 / h^2,  s = sin(p pi / (2N)),
  * from which the simulated frequencies and decay rates follow exactly (`discreteMode`).
  */
 import type { Grid } from './grid.ts';
@@ -180,8 +180,8 @@ export function discreteMode(
   const { N, h, k } = grid;
   const s = Math.sin((p * Math.PI) / (2 * N));
   const lambda2 = (physics.c * physics.c * k * k) / (h * h);
-  const mu2 = (physics.kappa * physics.kappa * k * k) / (h * h * h * h);
-  const a = 4 * lambda2 * s * s + 16 * mu2 * s ** 4;
+  const nu2 = (physics.kappa * physics.kappa * k * k) / (h * h * h * h);
+  const a = 4 * lambda2 * s * s + 16 * nu2 * s ** 4;
   const b = (8 * sigma1 * k * s * s) / (h * h);
   const c2 = 1 + sigma0 * k;
   const c0 = 1 - sigma0 * k - b;
@@ -190,10 +190,10 @@ export function discreteMode(
   return { frequency: Math.acos(cosTheta) / (2 * Math.PI * k), decay: -Math.log(modulus) / k };
 }
 
-/** Lossless dispersion relation of the scheme: sin^2(omega k / 2) = lambda^2 s^2 + 4 mu^2 s^4. */
+/** Lossless dispersion relation of the scheme: sin^2(omega k / 2) = lambda^2 s^2 + 4 nu^2 s^4. */
 export function discreteFrequencyLossless(p: number, grid: Grid): number {
   const s = Math.sin((p * Math.PI) / (2 * grid.N));
-  const v = grid.lambda * grid.lambda * s * s + 4 * grid.mu * grid.mu * s ** 4;
+  const v = grid.lambda * grid.lambda * s * s + 4 * grid.nu * grid.nu * s ** 4;
   return (2 * Math.asin(Math.min(1, Math.sqrt(v)))) / (2 * Math.PI * grid.k);
 }
 
