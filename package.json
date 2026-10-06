@@ -1,0 +1,44 @@
+{
+  "name": "monochord-string-lab",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Pluck, strike and hear a physically modelled string, and see why pluck position, stiffness and damping change its sound.",
+  "type": "module",
+  "license": "MIT",
+  "author": "Mustafa Obaid",
+  "homepage": "https://mustafaobaidd1.github.io/monochord-string-lab/",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/mustafaobaidd1/monochord-string-lab.git"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint .",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:e2e": "playwright test",
+    "screenshots": "node scripts/screenshots.mjs",
+    "check": "npm run lint && npm run typecheck && npm run format:check && npm test && npm run build && npm run test:e2e"
+  },
+  "devDependencies": {
+    "@axe-core/playwright": "^4.13.0",
+    "@eslint/js": "^10.0.1",
+    "@playwright/test": "^1.63.0",
+    "@types/node": "^24.0.0",
+    "eslint": "^10.12.0",
+    "globals": "^17.13.0",
+    "prettier": "^3.9.9",
+    "typescript": "~6.0.3",
+    "typescript-eslint": "^8.71.1",
+    "vite": "^8.3.3",
+    "vitest": "^5.0.3"
+  }
+}
