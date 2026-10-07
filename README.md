@@ -114,8 +114,12 @@ discrete energy exactly.
 **From simulation to sound.** The scheme runs in an AudioWorklet. The output (bridge force or
 pickup velocity) is normalised per string, high-passed at 4 Hz, then goes through a master volume
 and a soft limiter. Without AudioWorklet the same code runs on the main thread and is scheduled as
-short buffers; before the first tap it runs silently so the spectrum is alive anyway. The drawing
-comes from a second copy of the same voice on a slower clock. The measurement window is the first
+short buffers. **Measurement never depends on the speakers:** a main-thread copy of the same
+simulation, receiving the same commands and advanced in real time, feeds the spectrum, the partials
+table and f₁, so everything is measured before the first tap, without Web Audio, and on machines
+with no audio output device (watchdogs detect a processor that never starts or a clock that stands
+still, and the page says there is no sound). The drawing comes from a third copy of the same voice
+on a slower clock. The measurement window is the first
 0.35–1.2 s after each excitation (after the attack for a bow), with a Blackman–Harris window,
 zero-padding and quadratic interpolation of log-magnitude peaks; the fundamental is the lowest
 prominent peak that heads a harmonic series, found without using any predicted frequency.
@@ -195,7 +199,8 @@ equations, Vitest and Playwright (with axe) for tests.
   the main-thread fallback, the slow-motion picture engine, the tests and the validation script.
 - `src/audio/` — the AudioWorklet processor (bundled with `?worker&url` so it loads under the
   GitHub Pages base path), the synth with overlapping voices and a soft limiter, the sound engine
-  (worklet / main-thread stream / silent) and the analyser.
+  (a main-thread analysis copy that always runs, plus the worklet or a main-thread stream for
+  sound, with watchdogs for a missing output device) and the analyser.
 - `src/dsp/` — FFT, windows, peak interpolation, fundamental and partial measurement.
 - `src/ui/` — the string drawing, spectrum and waterfall, controls, keyboard, charts and the lazily
   loaded "How it works".

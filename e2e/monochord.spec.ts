@@ -226,3 +226,84 @@ test('bowing settles into Helmholtz motion: exact harmonics at the plucked pitch
   await page.mouse.up();
   await expect(button).not.toHaveClass(/is-bowing/);
 });
+
+/**
+ * A machine with no audio output device (for example a CI runner): the AudioContext claims to
+ * run but its clock never moves and the worklet processor never starts. Measurement must not
+ * depend on the speakers, and the page must say plainly that there is no sound.
+ */
+async function emulateNoAudioDevice(page: Page) {
+  await page.addInitScript(() => {
+    const noop = () => undefined;
+    class SilentAudioContext extends EventTarget {
+      state = 'running';
+      sampleRate = 48000;
+      currentTime = 0;
+      destination = {};
+      audioWorklet = { addModule: () => Promise.resolve() };
+      resume() {
+        return Promise.resolve();
+      }
+      suspend() {
+        this.state = 'suspended';
+        this.dispatchEvent(new Event('statechange'));
+        return Promise.resolve();
+      }
+      close() {
+        this.state = 'closed';
+        return Promise.resolve();
+      }
+      createGain() {
+        return { gain: { value: 1 }, connect: noop, disconnect: noop };
+      }
+      createBuffer() {
+        return { copyToChannel: noop };
+      }
+      createBufferSource() {
+        return { buffer: null, connect: noop, start: noop };
+      }
+    }
+    class SilentWorkletNode {
+      port = { postMessage: noop, onmessage: null };
+      onprocessorerror = null;
+      connect = noop;
+      disconnect = noop;
+    }
+    Object.assign(window, {
+      AudioContext: SilentAudioContext,
+      AudioWorkletNode: SilentWorkletNode,
+    });
+  });
+}
+
+test('without an audio output device the string is still measured, and the page says so', async ({
+  page,
+}) => {
+  await emulateNoAudioDevice(page);
+  await ready(page);
+  await measuredF0(page);
+  let n = await count(page);
+  await page.locator('.chip[data-preset="guitar-e4"]').click();
+  const f0 = await measuredF0(page, n);
+  expect(Math.abs(1200 * Math.log2(f0 / 329.63))).toBeLessThan(5);
+  // The audio path is declared failed once its clock is seen standing still.
+  await expect(page.locator('#sound-pill')).toHaveAttribute('data-status', 'failed', {
+    timeout: 10_000,
+  });
+  await expect(page.locator('#listen-note')).toContainText('No sound');
+  await expect(page.locator('#listen-note')).toContainText('still simulated and measured');
+  // Measurements carry on: the pluck at L/3 still removes partial 3 ...
+  n = await count(page);
+  await page.locator('#fractions button[data-fraction="3"]').click();
+  await measuredF0(page, n);
+  await expect(page.locator('#partials-body tr[data-partial="3"]')).toHaveAttribute(
+    'data-suppressed',
+    'true',
+  );
+  // ... and bowing still settles into Helmholtz motion.
+  n = await count(page);
+  await page.locator('.card--excite .segmented label', { hasText: 'Bow' }).click();
+  const bowed = await measuredF0(page, n);
+  expect(Math.abs(1200 * Math.log2(bowed / 329.63))).toBeLessThan(15);
+  await expect(page.locator('#spectrum-status')).toContainText('Helmholtz motion');
+});

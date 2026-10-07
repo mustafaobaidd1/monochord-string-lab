@@ -622,7 +622,8 @@ let soundMode: SoundMode = engine.mode;
 function onSoundStatus(status: SoundStatus, mode: SoundMode, detail?: string): void {
   soundStatus = status;
   soundMode = mode;
-  if (status === 'running' && engine.sampleRate !== analyzer.sampleRate) {
+  // The engine simulates at the audio device's rate once a context exists; follow it.
+  if (engine.sampleRate !== analyzer.sampleRate) {
     analyzer = makeAnalyzer(engine.sampleRate);
     picture = new PictureEngine(engine.sampleRate);
     render();
@@ -635,7 +636,7 @@ function onSoundStatus(status: SoundStatus, mode: SoundMode, detail?: string): v
       'This browser offers no Web Audio, so the string is simulated and analysed silently.';
   } else if (status === 'failed') {
     $('listen-note').textContent =
-      `Sound could not start${detail ? ` (${detail})` : ''}. The simulation keeps running silently; tap the sound button to retry.`;
+      `No sound: ${detail ?? 'the audio output could not start'}. The string is still simulated and measured; tap the sound button to try again.`;
   } else {
     $('listen-note').textContent = '';
   }
@@ -666,6 +667,8 @@ $('sound-pill').addEventListener('click', () => {
   if (soundStatus === 'running') {
     update({ muted: !state.muted });
     sendMaster();
+  } else if (soundStatus === 'failed') {
+    void engine.retry();
   } else {
     void engine.start();
   }
@@ -802,6 +805,7 @@ reducedMotion.addEventListener('change', () => render());
 render();
 updateKeyboard();
 sendMaster();
+onSoundStatus(engine.status, engine.mode);
 // The opening example: a silent pluck, so the string and the spectrum are alive at once.
 excite();
 requestAnimationFrame((t) => {

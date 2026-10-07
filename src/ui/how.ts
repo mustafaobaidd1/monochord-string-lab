@@ -172,7 +172,9 @@ export function renderHow(root: HTMLElement): void {
       <p>The scheme runs in an <strong>AudioWorklet</strong> at the audio sample rate. The output is the bridge force (or
       the pickup velocity), scaled by a per-string reference so different strings sound comparably loud, high-passed at
       4 Hz, then a master volume and a soft limiter. If AudioWorklet is missing, the same code runs on the main thread
-      and is played as short buffers; before the first tap it runs silently so the spectrum is alive anyway.</p>
+      and is played as short buffers. Measurement never depends on the speakers: a main-thread copy of the same
+      simulation, receiving the same commands, feeds the spectrum and the partials table, so they work before the first
+      tap, without Web Audio, and on machines with no audio output device.</p>
       <p>The drawing comes from a second copy of the same voice on a slower clock (slow motion, ×4 to ×1024 chosen so the
       fundamental appears at about one cycle per second). The spectrum is measured from the first 0.35–1.2 s after each
       excitation with a Blackman–Harris window, zero-padding and quadratic interpolation of log-magnitude peaks.</p>

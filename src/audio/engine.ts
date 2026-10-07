@@ -1,13 +1,17 @@
 /**
- * Sound engine. Three modes, chosen at run time:
+ * Sound engine.
+ *
+ * Measurement never depends on the audio device: a main-thread copy of the string (the same
+ * synth code, receiving the same commands, advanced in real time by the animation clock) feeds
+ * the analyser in every situation. Sound is produced separately, by one of:
  *
  *  - worklet:  the string runs in an AudioWorklet at the audio rate (preferred).
- *  - stream:   AudioWorklet is unavailable; the same synth runs on the main thread and its
- *              output is scheduled as short AudioBuffers slightly ahead of the audio clock.
- *  - silent:   sound is not started yet (autoplay policy) or Web Audio is missing; the synth runs
- *              on the main thread only to feed the analyser, so the spectrum still works.
+ *  - stream:   AudioWorklet is unavailable; a second main-thread synth renders short
+ *              AudioBuffers scheduled slightly ahead of the audio clock.
+ *  - silent:   no sound yet (autoplay policy), no Web Audio, or the audio device failed.
  *
- * In every mode the analyser receives the dry string signal on one continuous clock.
+ * Watchdogs report an audio path that never starts or whose clock stands still (for example a
+ * machine with no output device); the simulation and the analysis carry on regardless.
  */
 import processorUrl from './string-processor.ts?worker&url';
 import type { FromWorklet, ToWorklet } from './protocol.ts';
@@ -15,12 +19,12 @@ import { StringSynth, type OnsetInfo, type SynthCommand } from './synth.ts';
 
 export type SoundMode = 'silent' | 'worklet' | 'stream';
 export type SoundStatus =
-  | 'idle' // never started: "Tap to enable sound"
+  | 'idle' // never started: "Enable sound"
   | 'starting'
   | 'running'
   | 'suspended' // tab hidden or interrupted
   | 'unavailable' // no Web Audio at all
-  | 'failed'; // the audio device or worklet failed
+  | 'failed'; // the audio device or the processor failed
 
 export interface EngineListener {
   samples(frame: number, data: Float32Array): void;
@@ -32,45 +36,53 @@ export interface EngineListener {
 export type AudioPreference = 'auto' | 'fallback' | 'off';
 
 const DEFAULT_RATE = 48000;
-const STREAM_BLOCK = 1024;
+const BLOCK = 1024;
 const STREAM_LOOKAHEAD = 0.12;
+/** The worklet must report ready within this time, s. */
+const READY_TIMEOUT = 4;
+/** A running context whose clock does not move for this long has no working output, s. */
+const STALL_TIMEOUT = 2.5;
 
 export class SoundEngine {
+  /** Which path produces sound. */
   mode: SoundMode = 'silent';
   status: SoundStatus = 'idle';
   sampleRate: number;
   private ctx: AudioContext | null = null;
   private node: AudioWorkletNode | null = null;
   private streamGain: GainNode | null = null;
-  private synth: StringSynth;
+  /** Main-thread copy of the string that feeds the analyser, with or without sound. */
+  private analysis: StringSynth;
+  /** Main-thread synth that plays sound when AudioWorklet is unavailable. */
+  private streamSynth: StringSynth | null = null;
   private queue: ToWorklet[] = [];
   private workletReady = false;
-  private clockOffset = 0;
-  private lastAnalysisFrame = 0;
-  private silentClock = -1;
+  private readyTimer = 0;
+  private quietSince = -1;
   private streamTime = 0;
   private master = { volume: 0.8, muted: false };
-  private block = new Float32Array(STREAM_BLOCK);
-  private wet = new Float32Array(STREAM_BLOCK);
+  private block = new Float32Array(BLOCK);
+  private wet = new Float32Array(BLOCK);
   private wasRunning = false;
   private startPromise: Promise<void> | null = null;
+  private clockCheck: { wall: number; audio: number } | null = null;
 
   constructor(
     private readonly listener: EngineListener,
     private readonly preference: AudioPreference = 'auto',
   ) {
     this.sampleRate = DEFAULT_RATE;
-    this.synth = this.makeSynth(DEFAULT_RATE);
-    if (preference === 'off' || typeof window.AudioContext !== 'function') {
-      this.setStatus('unavailable');
-    }
+    this.analysis = this.makeSynth(DEFAULT_RATE, true);
+    // Reported by the page once it is set up (it reads `status` after construction).
+    if (preference === 'off' || typeof window.AudioContext !== 'function')
+      this.status = 'unavailable';
     document.addEventListener('visibilitychange', () => this.onVisibility());
   }
 
-  private makeSynth(rate: number): StringSynth {
+  private makeSynth(rate: number, analysis: boolean): StringSynth {
     const synth = new StringSynth(rate);
-    synth.onOnset = (info) => this.emitOnset(info, info.frame);
-    synth.onError = (message) => this.listener.error(message);
+    if (analysis) synth.onOnset = (info) => this.listener.onset({ ...info, frame: info.frame });
+    synth.onError = analysis ? (message) => this.listener.error(message) : null;
     synth.master.set(this.master.volume, this.master.muted);
     return synth;
   }
@@ -84,11 +96,26 @@ export class SoundEngine {
     return this.status === 'running' && this.mode !== 'silent';
   }
 
+  /** After a failure, tries again with a fresh audio context (call from a user gesture). */
+  retry(): Promise<void> {
+    if (this.status !== 'failed' || !this.ctx) return this.start();
+    void this.ctx.close().catch(() => undefined);
+    this.ctx = null;
+    this.node = null;
+    this.workletReady = false;
+    this.startPromise = null;
+    this.mode = 'silent';
+    this.status = 'idle';
+    return this.start();
+  }
+
   /** Must be called from a user gesture (pointer or key event handler). */
   start(): Promise<void> {
     if (this.status === 'unavailable') return Promise.resolve();
     if (this.ctx) {
-      if (this.ctx.state === 'suspended') void this.ctx.resume().catch(() => undefined);
+      if (this.ctx.state === 'suspended' && this.status !== 'failed') {
+        void this.ctx.resume().catch(() => undefined);
+      }
       return this.startPromise ?? Promise.resolve();
     }
     let ctx: AudioContext;
@@ -99,6 +126,12 @@ export class SoundEngine {
       return Promise.resolve();
     }
     this.ctx = ctx;
+    // Simulate at the device's own rate, so what is measured is exactly what is heard.
+    if (ctx.sampleRate !== this.sampleRate) {
+      this.sampleRate = ctx.sampleRate;
+      this.analysis = this.makeSynth(ctx.sampleRate, true);
+      this.analysis.handle({ type: 'master', ...this.master });
+    }
     void ctx.resume().catch(() => undefined);
     ctx.addEventListener('statechange', () => this.onContextState());
     this.setStatus('starting');
@@ -120,9 +153,13 @@ export class SoundEngine {
         node.onprocessorerror = () => this.workletFailed('The audio processor stopped.');
         node.connect(ctx.destination);
         this.node = node;
-        this.sampleRate = ctx.sampleRate;
-        this.switchSource('worklet');
-        // Commands sent while loading are delivered once the processor reports ready.
+        this.mode = 'worklet';
+        // Commands sent from now on are queued until the processor reports ready.
+        this.readyTimer = window.setTimeout(() => {
+          if (!this.workletReady) {
+            this.audioFailed('the audio processor did not start (is there an output device?)');
+          }
+        }, READY_TIMEOUT * 1000);
         this.onContextState();
         return;
       } catch (err) {
@@ -135,13 +172,12 @@ export class SoundEngine {
   private startStream(ctx: AudioContext): void {
     this.node?.disconnect();
     this.node = null;
+    window.clearTimeout(this.readyTimer);
     this.streamGain = ctx.createGain();
     this.streamGain.connect(ctx.destination);
-    this.sampleRate = ctx.sampleRate;
-    this.synth = this.makeSynth(ctx.sampleRate);
+    this.streamSynth = this.makeSynth(ctx.sampleRate, false);
     this.streamTime = 0;
-    this.switchSource('stream');
-    for (const cmd of this.queue) if (cmd.type !== 'stream') this.synth.handle(cmd);
+    this.mode = 'stream';
     this.queue = [];
     this.onContextState();
   }
@@ -151,15 +187,21 @@ export class SoundEngine {
     if (this.ctx) this.startStream(this.ctx);
   }
 
-  /** Re-bases the analysis clock so samples from the new source continue the old timeline. */
-  private switchSource(mode: SoundMode): void {
-    this.mode = mode;
-    this.clockOffset = this.lastAnalysisFrame;
-    this.silentClock = -1;
+  /** The audio path is not working: stop trying to play, keep simulating and measuring. */
+  private audioFailed(detail: string): void {
+    window.clearTimeout(this.readyTimer);
+    this.node?.disconnect();
+    this.node = null;
+    this.streamSynth = null;
+    this.queue = [];
+    this.mode = 'silent';
+    this.clockCheck = null;
+    void this.ctx?.suspend().catch(() => undefined);
+    this.setStatus('failed', detail);
   }
 
   private onContextState(): void {
-    if (!this.ctx) return;
+    if (!this.ctx || this.status === 'failed') return;
     const state = this.ctx.state as string;
     if (state === 'running') {
       if (this.mode === 'worklet' && !this.workletReady) this.setStatus('starting');
@@ -167,35 +209,31 @@ export class SoundEngine {
     } else if (state === 'suspended' || state === 'interrupted') {
       this.setStatus(this.status === 'starting' && !this.wasRunning ? 'starting' : 'suspended');
     } else if (state === 'closed') {
-      this.setStatus('failed', 'The audio context closed.');
+      this.audioFailed('the audio context closed');
     }
   }
 
   private onVisibility(): void {
-    if (!this.ctx) return;
+    if (!this.ctx || this.status === 'failed') return;
     if (document.visibilityState === 'hidden') {
       this.wasRunning = this.ctx.state === 'running';
       if (this.wasRunning) void this.ctx.suspend().catch(() => undefined);
     } else if (this.wasRunning) {
       void this.ctx.resume().catch(() => undefined);
     }
+    this.clockCheck = null;
   }
 
   private fromWorklet(msg: FromWorklet): void {
     switch (msg.type) {
       case 'ready':
+        if (this.status === 'failed') return;
         this.workletReady = true;
-        this.sampleRate = msg.sampleRate;
+        window.clearTimeout(this.readyTimer);
         for (const cmd of this.queue) this.node?.port.postMessage(cmd);
         this.queue = [];
         this.node?.port.postMessage({ type: 'master', ...this.master });
         this.onContextState();
-        break;
-      case 'samples':
-        this.emitSamples(msg.frame, msg.data);
-        break;
-      case 'onset':
-        this.emitOnset(msg, msg.frame);
         break;
       case 'error':
         this.listener.error(msg.message);
@@ -203,75 +241,79 @@ export class SoundEngine {
     }
   }
 
-  private emitSamples(frame: number, data: Float32Array): void {
-    const f = frame + this.clockOffset;
-    this.lastAnalysisFrame = Math.max(this.lastAnalysisFrame, f + data.length);
-    this.listener.samples(f, data);
-  }
-
-  private emitOnset(info: OnsetInfo, frame: number): void {
-    this.listener.onset({ ...info, frame: frame + this.clockOffset });
-  }
-
   send(cmd: SynthCommand): void {
     if (cmd.type === 'master') this.master = { volume: cmd.volume, muted: cmd.muted };
+    // The analysis copy always hears every command.
+    this.analysis.handle(cmd);
     if (this.mode === 'worklet') {
       if (this.workletReady) this.node?.port.postMessage(cmd);
       else this.queue.push(cmd);
-      return;
+    } else if (this.mode === 'stream') {
+      this.streamSynth?.handle(cmd);
     }
-    if (this.status === 'starting' && this.mode === 'silent' && this.ctx) {
-      // The worklet is still loading: queue for it, but also keep the analysis running.
-      this.queue.push(cmd);
-    }
-    this.synth.handle(cmd);
   }
 
   /** Main-thread work, called once per animation frame with the elapsed wall time. */
   tick(dtSeconds: number): void {
-    if (this.mode === 'worklet') return;
-    if (this.mode === 'stream' && this.ctx && this.streamGain) {
-      this.pumpStream(this.ctx, this.streamGain);
-      return;
+    this.renderAnalysis(dtSeconds);
+    if (this.mode === 'stream' && this.ctx && this.streamGain && this.streamSynth) {
+      this.pumpStream(this.ctx, this.streamGain, this.streamSynth);
     }
-    // Silent: render the elapsed time (capped, so a long pause does not stall a frame).
-    const n = Math.min(Math.round(dtSeconds * this.synth.sampleRate), 4096);
-    if (n <= 0) return;
-    if (this.silentClock < 0) this.silentClock = this.synth.frame;
+    this.watchClock();
+  }
+
+  /** Advances the analysis copy by the elapsed time (capped, so a long pause cannot stall). */
+  private renderAnalysis(dtSeconds: number): void {
+    const synth = this.analysis;
+    const n = Math.min(Math.round(dtSeconds * synth.sampleRate), 4096);
     let left = n;
     while (left > 0) {
-      const count = Math.min(left, STREAM_BLOCK);
-      const frame = this.synth.frame;
-      this.synth.render(this.block, count);
-      if (this.synth.active || frame - this.silentClock < this.synth.sampleRate) {
-        this.emitSamples(frame, this.block.slice(0, count));
+      const count = Math.min(left, BLOCK);
+      const frame = synth.frame;
+      synth.render(this.block, count);
+      // Keep feeding the analyser for a second after the string falls silent.
+      if (synth.active) this.quietSince = -1;
+      else if (this.quietSince < 0) this.quietSince = frame;
+      if (synth.active || frame - this.quietSince < synth.sampleRate) {
+        this.listener.samples(frame, this.block.slice(0, count));
       }
-      if (this.synth.active) this.silentClock = frame;
       left -= count;
     }
   }
 
-  private pumpStream(ctx: AudioContext, gain: GainNode): void {
+  private pumpStream(ctx: AudioContext, gain: GainNode, synth: StringSynth): void {
     if (ctx.state !== 'running') return;
     const now = ctx.currentTime;
     if (this.streamTime < now + 0.01) this.streamTime = now + 0.03;
     while (this.streamTime < now + STREAM_LOOKAHEAD) {
-      const frame = this.synth.frame;
-      this.synth.render(this.block, STREAM_BLOCK);
-      this.synth.master.process(this.block, this.wet, STREAM_BLOCK);
-      const buffer = ctx.createBuffer(1, STREAM_BLOCK, ctx.sampleRate);
+      synth.render(this.block, BLOCK);
+      synth.master.process(this.block, this.wet, BLOCK);
+      const buffer = ctx.createBuffer(1, BLOCK, ctx.sampleRate);
       buffer.copyToChannel(this.wet, 0);
       const src = ctx.createBufferSource();
       src.buffer = buffer;
       src.connect(gain);
       src.start(this.streamTime);
-      this.streamTime += STREAM_BLOCK / ctx.sampleRate;
-      if (this.synth.active) this.emitSamples(frame, this.block.slice());
+      this.streamTime += BLOCK / ctx.sampleRate;
     }
   }
 
-  /** The synth clock frame currently being heard (for aligning visuals in stream mode). */
-  get frame(): number {
-    return this.lastAnalysisFrame;
+  /** Detects a context that claims to run but whose clock never moves (no output device). */
+  private watchClock(): void {
+    const ctx = this.ctx;
+    if (!ctx || this.mode === 'silent' || ctx.state !== 'running') {
+      this.clockCheck = null;
+      return;
+    }
+    if (document.visibilityState === 'hidden') return;
+    const wall = performance.now() / 1000;
+    const audio = ctx.currentTime;
+    if (!this.clockCheck || audio !== this.clockCheck.audio) {
+      this.clockCheck = { wall, audio };
+      return;
+    }
+    if (wall - this.clockCheck.wall > STALL_TIMEOUT) {
+      this.audioFailed('the audio clock stands still (no output device?)');
+    }
   }
 }
