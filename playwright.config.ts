@@ -12,6 +12,8 @@ export default defineConfig({
   use: {
     baseURL: BASE,
     trace: 'retain-on-failure',
+    // Let the AudioWorklet start in headless runs; the app also copes when audio cannot start.
+    launchOptions: { args: ['--autoplay-policy=no-user-gesture-required'] },
   },
   projects: [
     {

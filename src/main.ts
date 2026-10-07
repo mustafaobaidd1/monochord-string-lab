@@ -447,6 +447,7 @@ function onSnapshot(s: Snapshot): void {
   renderPartials($('partials-body'), prediction, s);
   const out = $('f0-readout');
   out.removeAttribute('data-state');
+  out.dataset.count = String(Number(out.dataset.count ?? 0) + 1);
   if (!s.fundamental) {
     out.textContent = 'no clear peak';
     out.setAttribute('data-measured-f0', '');
