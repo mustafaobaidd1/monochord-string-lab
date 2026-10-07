@@ -308,7 +308,7 @@ export const PARAMS: ParamDef[] = [
     range: () => [0.04, 0.5],
     get: (s) => s.bow.fromBridge,
     set: (s, v) => (s.bow.fromBridge = v),
-    format: (v, ctx) => `${mm(v * ctx.state.string.length)} from the bridge · β = ${v.toFixed(2)}`,
+    format: (v, ctx) => `${mm(v * ctx.state.string.length)} · β = ${v.toFixed(2)}`,
     spoken: (v) => `beta ${v.toFixed(2)} of the length from the bridge`,
     limit: (end) =>
       end === 'min'

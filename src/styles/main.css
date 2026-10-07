@@ -2040,3 +2040,35 @@ kbd {
 .card--excite .segmented span {
   padding-inline: 12px;
 }
+
+@media (pointer: coarse) {
+  .chip {
+    min-height: 44px;
+  }
+}
+
+@media (max-width: 420px) {
+  .topbar {
+    font-size: 13px;
+  }
+
+  .topbar a {
+    white-space: nowrap;
+  }
+
+  .stage-tools {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .sound-pill {
+    padding: 8px 12px 8px 10px;
+    font-size: 13.5px;
+    white-space: nowrap;
+  }
+
+  .switch {
+    gap: 6px;
+    font-size: 13.5px;
+  }
+}
