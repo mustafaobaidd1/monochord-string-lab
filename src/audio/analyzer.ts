@@ -49,8 +49,32 @@ export interface Snapshot {
 }
 
 const RING = 1 << 17;
+/** Default window lengths (samples); `setResolution` adapts them to the string's pitch. */
 export const LIVE_FFT = 16384;
-export const ROW_FFT = 16384;
+export const ROW_FFT = 8192;
+
+/**
+ * Window lengths that resolve partials spaced f0 apart: the Blackman-Harris main lobe spans
+ * +-4 bins, so the live view uses about 12 bins per partial spacing and the waterfall about 8.
+ */
+export function windowSizes(f0: number, sampleRate: number): { live: number; row: number } {
+  const pow2 = (n: number) => 2 ** Math.ceil(Math.log2(n));
+  const clamp = (n: number, lo: number, hi: number) => Math.min(hi, Math.max(lo, n));
+  return {
+    live: clamp(pow2((12 * sampleRate) / f0), 8192, 32768),
+    row: clamp(pow2((8 * sampleRate) / f0), 4096, 16384),
+  };
+}
+
+const windows = new Map<number, ReturnType<typeof makeWindow>>();
+function bhWindow(n: number) {
+  let w = windows.get(n);
+  if (!w) {
+    w = makeWindow('blackman-harris', n);
+    windows.set(n, w);
+  }
+  return w;
+}
 
 export class Analyzer {
   readonly sampleRate: number;
@@ -61,8 +85,8 @@ export class Analyzer {
   private context: AnalysisContext | null = null;
   private lastRowFrame = 0;
   private readonly rowHop: number;
-  private readonly rowWindow = makeWindow('blackman-harris', ROW_FFT);
-  private readonly liveWindow = makeWindow('blackman-harris', LIVE_FFT);
+  private liveSize = LIVE_FFT;
+  private rowSize = ROW_FFT;
   private quietFrames = 0;
   /** True when new samples arrived since the last live spectrum. */
   dirty = false;
@@ -80,6 +104,9 @@ export class Analyzer {
   /** The page announces what it just excited; the next onset is matched with it. */
   expect(context: AnalysisContext): void {
     this.context = context;
+    const sizes = windowSizes(context.f0, this.sampleRate);
+    this.liveSize = sizes.live;
+    this.rowSize = sizes.row;
   }
 
   /** A voice started free vibration at `frame`. */
@@ -144,31 +171,33 @@ export class Analyzer {
     while (this.lastRowFrame + this.rowHop <= this.writeFrame) {
       this.lastRowFrame += this.rowHop;
       if (this.silent) continue;
-      const x = this.read(this.lastRowFrame, ROW_FFT);
-      const { w, coherentGain } = this.rowWindow;
-      const y = new Float64Array(ROW_FFT);
-      for (let i = 0; i < ROW_FFT; i++) y[i] = x[i] * w[i];
-      const power = realPowerSpectrum(y, ROW_FFT);
-      const norm = 2 / (ROW_FFT * coherentGain);
+      const n = this.rowSize;
+      const x = this.read(this.lastRowFrame, n);
+      const { w, coherentGain } = bhWindow(n);
+      const y = new Float64Array(n);
+      for (let i = 0; i < n; i++) y[i] = x[i] * w[i];
+      const power = realPowerSpectrum(y, n);
+      const norm = 2 / (n * coherentGain);
       const db = new Float64Array(power.length);
       for (let k = 0; k < power.length; k++) {
         const m = Math.sqrt(power[k]) * norm;
         db[k] = m > 0 ? 20 * Math.log10(m) : -200;
       }
-      this.onRow(db, this.sampleRate / ROW_FFT);
+      this.onRow(db, this.sampleRate / n);
     }
   }
 
   /** Spectrum of the most recent `LIVE_FFT` samples (Blackman-Harris window, zero-padded x2). */
   liveSpectrum(): Spectrum {
     this.dirty = false;
-    const x = this.read(this.writeFrame, LIVE_FFT);
-    const { w, coherentGain } = this.liveWindow;
-    const y = new Float64Array(LIVE_FFT);
-    for (let i = 0; i < LIVE_FFT; i++) y[i] = x[i] * w[i];
-    const fftSize = LIVE_FFT * 2;
+    const n = this.liveSize;
+    const x = this.read(this.writeFrame, n);
+    const { w, coherentGain } = bhWindow(n);
+    const y = new Float64Array(n);
+    for (let i = 0; i < n; i++) y[i] = x[i] * w[i];
+    const fftSize = n * 2;
     const power = realPowerSpectrum(y, fftSize);
-    const norm = 2 / (LIVE_FFT * coherentGain);
+    const norm = 2 / (n * coherentGain);
     const db = new Float64Array(power.length);
     for (let k = 0; k < power.length; k++) {
       const m = Math.sqrt(power[k]) * norm;

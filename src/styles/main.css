@@ -210,6 +210,10 @@ h1 {
   grid-column: 1 / -1;
 }
 
+.spec-row--wide dd {
+  font-size: 15px;
+}
+
 .spec-row:nth-last-child(-n + 2) {
   border-bottom: 0;
 }
@@ -581,7 +585,7 @@ h1 {
   grid-template-areas:
     'spec spec spec spec spec spec spec spec excite excite excite excite'
     'spec spec spec spec spec spec spec spec listen listen listen listen'
-    'string string string string exp exp exp exp part part part part'
+    'string string string string exp exp exp part part part part part'
     'keys keys keys keys keys keys keys keys keys keys keys keys';
   gap: 18px;
   max-width: 1600px;
@@ -830,8 +834,12 @@ legend.field-label {
   color: var(--rust);
 }
 
-.field--disabled {
-  opacity: 0.55;
+.field--disabled input[type='range'] {
+  opacity: 0.4;
+}
+
+.field--disabled .field-value {
+  color: var(--ink-soft);
 }
 
 input[type='range'] {
@@ -1232,7 +1240,6 @@ kbd {
   font-weight: 500;
   letter-spacing: 0.02em;
   text-transform: none;
-  opacity: 0.8;
 }
 
 @media (max-width: 700px) {
@@ -1797,4 +1804,42 @@ kbd {
   .col-predicted {
     display: none;
   }
+}
+
+.stage-hint--right {
+  transform: none;
+}
+
+.stage-hint--right svg {
+  order: -1;
+  transform: scale(-1, -1) translateY(-14px);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .stage-hint--right:not(.is-hidden) svg {
+    animation-name: hint-nudge-right;
+  }
+}
+
+@keyframes hint-nudge-right {
+  0%,
+  100% {
+    transform: scale(-1, -1) translateY(-14px);
+  }
+  50% {
+    transform: scale(-1, -1) translateY(-8px);
+  }
+}
+
+@media (max-width: 700px) {
+  .how .katex-display {
+    font-size: 0.92em;
+  }
+}
+
+.how-table:focus-visible,
+.table-scroll:focus-visible,
+.tex-block:focus-visible {
+  outline: 2px solid var(--indigo);
+  outline-offset: 2px;
 }

@@ -212,6 +212,7 @@ function placeHint(): void {
     (band.getBoundingClientRect().top - $('stage').getBoundingClientRect().top);
   if (x > 0) band.style.setProperty('--hint-x', `${x}px`);
   band.style.setProperty('--hint-y', `${Math.max(0, y - 70)}px`);
+  $('stage-hint').classList.toggle('stage-hint--right', x < band.clientWidth * 0.42);
 }
 
 /** Keeps the note when the material or gauge changes (a player would retune). */
@@ -457,10 +458,14 @@ function onSnapshot(s: Snapshot): void {
   const predicted1 = prediction.frequencies[0];
   const dev = 1200 * Math.log2(f / predicted1);
   const suppressed = s.partials.filter((p) => p.suppressed).map((p) => p.n);
-  const where = prediction.kind === 'pluck' ? 'pluck' : 'strike';
   let text = `Measured f₁ = ${hz(f)} (${pitchLabel(f)}), ${Math.abs(dev).toFixed(2)} ¢ from theory.`;
   if (suppressed.length) {
-    text += ` Partial${suppressed.length > 1 ? 's' : ''} ${suppressed.join(', ')} ${suppressed.length > 1 ? 'are' : 'is'} suppressed, as the ${where} at ${ratio(prediction.fromBridge)} predicts.`;
+    const causes = [
+      `${prediction.kind === 'pluck' ? 'pluck' : 'strike'} at ${ratio(Math.min(prediction.fromBridge, 1 - prediction.fromBridge))}`,
+    ];
+    if (prediction.output === 'pickup')
+      causes.push(`pickup at ${ratio(prediction.pickupFromBridge)}`);
+    text += ` Partial${suppressed.length > 1 ? 's' : ''} ${suppressed.join(', ')} ${suppressed.length > 1 ? 'are' : 'is'} suppressed, as predicted for the ${causes.join(' and the ')}.`;
   }
   $('spectrum-status').textContent = text;
   $('spectrum-canvas').setAttribute('aria-label', `Spectrum and waterfall. ${text}`);

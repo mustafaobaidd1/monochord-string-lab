@@ -193,6 +193,7 @@ describe('analyser', () => {
     const flagged = s.partials.filter((p) => p.suppressed).map((p) => p.n);
     expect(flagged).toEqual([3, 6, 9, 12]);
     expect(s.partials.filter((p) => p.predictedSuppressed).map((p) => p.n)).toEqual([3, 6, 9, 12]);
-    expect(analyzer.liveSpectrum().db.length).toBe(16385);
+    // E2: about 12 bins per partial spacing, rounded up to a power of two (8192), zero-padded x2.
+    expect(analyzer.liveSpectrum().db.length).toBe(8193);
   });
 });

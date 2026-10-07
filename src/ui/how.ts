@@ -48,13 +48,13 @@ function validationTable(): string {
   rows.push(
     `<tr><td>Hammer and string together (lossless)</td><td>total energy conserved</td><td>max drift ${exp(Math.max(...r.hammer.map((h) => h.drift)))}</td><td>machine precision</td></tr>`,
   );
-  return `<div class="how-table"><table>
+  return `<div class="how-table" tabindex="0" role="region" aria-label="Validation results"><table>
     <thead><tr><th scope="col">Check</th><th scope="col">Reference</th><th scope="col">Measured</th><th scope="col">Target</th></tr></thead>
     <tbody>${rows.join('')}</tbody></table></div>`;
 }
 
 function presetTable(): string {
-  return `<div class="how-table"><table>
+  return `<div class="how-table" tabindex="0" role="region" aria-label="Preset sources"><table>
     <thead><tr><th scope="col">Preset</th><th scope="col">String</th><th scope="col">Source of the construction</th></tr></thead>
     <tbody>${PRESETS.map((p) => `<tr><td>${p.name}</td><td>${p.detail}</td><td>${p.source}</td></tr>`).join('')}</tbody>
   </table></div>`;
@@ -78,7 +78,7 @@ export function renderHow(root: HTMLElement): void {
       <h3>1 · The stiff, damped string</h3>
       <p>The transverse displacement ${t('u(x,t)')} of a string of length ${t('L')}, tension ${t('T')}, linear density
       ${t('\\mu = \\rho A')} and bending stiffness ${t('EI')} obeys (Bilbao 2009)</p>
-      ${T('u_{tt} = c^2 u_{xx} - \\kappa^2 u_{xxxx} - 2\\sigma_0 u_t + 2\\sigma_1 u_{txx},\\qquad c=\\sqrt{T/\\mu},\\; \\kappa=\\sqrt{EI/\\mu}')}
+      ${T('\\begin{gathered}u_{tt} = c^2 u_{xx} - \\kappa^2 u_{xxxx} - 2\\sigma_0 u_t + 2\\sigma_1 u_{txx}\\\\ c=\\sqrt{T/\\mu},\\qquad \\kappa=\\sqrt{EI/\\mu}\\end{gathered}')}
       <p>The first term is the ideal string; the second resists bending; ${t('\\sigma_0')} removes energy equally at all
       frequencies and ${t('\\sigma_1')} removes more at short wavelengths. Both ends are simply supported:
       ${t('u = u_{xx} = 0')}. The material and diameter ${t('d')} set ${t('\\mu = \\rho\\pi d^2/4')} and
@@ -89,7 +89,7 @@ export function renderHow(root: HTMLElement): void {
     <section>
       <h3>2 · Partials and inharmonicity</h3>
       <p>Each mode ${t('\\sin(n\\pi x/L)')} vibrates on its own:</p>
-      ${T('f_n = n f_0\\sqrt{1 + B n^2},\\qquad f_0 = \\frac{1}{2L}\\sqrt{\\frac{T}{\\mu}},\\qquad B = \\frac{\\pi^2 EI}{TL^2} = \\frac{\\pi^3 E d^4}{64\\, T L^2}')}
+      ${T('\\begin{gathered}f_n = n f_0\\sqrt{1 + B n^2},\\qquad f_0 = \\frac{1}{2L}\\sqrt{\\frac{T}{\\mu}}\\\\ B = \\frac{\\pi^2 EI}{TL^2} = \\frac{\\pi^3 E d^4}{64\\, T L^2}\\;\\text{(solid wire)}\\end{gathered}')}
       ${T('\\text{decay rate}\\quad \\sigma_n = \\sigma_0 + \\sigma_1\\left(\\frac{n\\pi}{L}\\right)^2')}
       <p>Stiffness pushes every partial sharp, and more so the higher it is. For the piano A0 preset
       (${t('B \\approx 2.1\\times10^{-4}')}) partial 20 sits about 67 cents (two thirds of a semitone) above
@@ -135,12 +135,12 @@ export function renderHow(root: HTMLElement): void {
       <p>with centred ${t('\\delta_{t\\cdot}')} and backward ${t('\\delta_{t-}')} differences, which keeps it explicit.
       Writing ${t('\\lambda = ck/h')} and ${t('\\nu = \\kappa k/h^2')}, a von Neumann analysis of every mode gives the
       stability condition</p>
-      ${T('h \\ge h_{\\min} = \\sqrt{\\tfrac12\\left(c^2k^2 + 4\\sigma_1 k + \\sqrt{(c^2k^2 + 4\\sigma_1k)^2 + 16\\kappa^2k^2}\\right)}')}
+      ${T('\\begin{gathered}h \\ge h_{\\min},\\\\ h_{\\min}^2 = \\tfrac12\\left(c^2k^2 + 4\\sigma_1 k + \\sqrt{(c^2k^2 + 4\\sigma_1k)^2 + 16\\kappa^2k^2}\\right)\\end{gathered}')}
       <p>The grid uses ${t('N = \\lfloor L/h_{\\min}\\rfloor')} intervals (at most ${results.maxPoints}), as close to the
       bound as possible because that minimises numerical dispersion. The simulated partials follow the exact discrete
       relation ${t('\\sin^2(\\omega k/2) = \\lambda^2 s^2 + 4\\nu^2 s^4')}, ${t('s = \\sin(n\\pi/2N)')}: about a cent flat of
       the continuous law at the 10th partial, growing as ${t('n^2')}. Without loss the discrete energy</p>
-      ${T('\\mathfrak{h} = \\tfrac{\\mu}{2}\\lVert\\delta_{t-}u\\rVert^2 + \\tfrac{T}{2}\\langle\\delta_{x+}u, e_{t-}\\delta_{x+}u\\rangle + \\tfrac{EI}{2}\\langle\\delta_{xx}u, e_{t-}\\delta_{xx}u\\rangle')}
+      ${T('\\begin{aligned}\\mathfrak{h} = {} & \\tfrac{\\mu}{2}\\lVert\\delta_{t-}u\\rVert^2 + \\tfrac{T}{2}\\langle\\delta_{x+}u,\\, e_{t-}\\delta_{x+}u\\rangle\\\\ & + \\tfrac{EI}{2}\\langle\\delta_{xx}u,\\, e_{t-}\\delta_{xx}u\\rangle\\end{aligned}')}
       <p>is conserved to rounding error, which the tests check.</p>
     </section>
 
@@ -211,5 +211,13 @@ export function renderHow(root: HTMLElement): void {
       throwOnError: false,
       output: 'htmlAndMathml',
     });
+  }
+  // Formulas wider than a narrow screen scroll sideways; make those reachable by keyboard.
+  for (const el of root.querySelectorAll<HTMLElement>('.tex-block')) {
+    if (el.scrollWidth > el.clientWidth + 1) {
+      el.tabIndex = 0;
+      el.setAttribute('role', 'region');
+      el.setAttribute('aria-label', 'Equation (scrolls sideways)');
+    }
   }
 }

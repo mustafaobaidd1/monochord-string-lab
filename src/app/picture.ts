@@ -145,7 +145,7 @@ export class PictureEngine {
       this.capture(0);
       this.shapeCount = 1;
     } else {
-      const parts = mode === 'realtime' ? BLUR_SHAPES : 8;
+      const parts = mode === 'realtime' ? BLUR_SHAPES : 24;
       let done = 0;
       for (let i = 0; i < parts; i++) {
         const target = Math.round(((i + 1) * steps) / parts);
