@@ -126,7 +126,7 @@ test('the keyboard retunes the tension to each note', async ({ page }) => {
   n = await count(page);
   const g2Expected = 97.9989 * Math.sqrt(1 + 1.466e-4 * (82.4069 / 97.9989) ** 2);
   expect(Math.abs(1200 * Math.log2(g2 / g2Expected))).toBeLessThan(5);
-  await expect(page.locator('#keyboard-note')).toContainText('G2');
+  await expect(page.locator('#note-readout')).toContainText('G2');
   // The on-screen key does the same.
   await page.locator('.key[data-midi="36"]').click(); // C2
   const c2 = await measuredF0(page, n);
