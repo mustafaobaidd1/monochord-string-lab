@@ -4,6 +4,7 @@
  * captures several shapes per frame (what the eye sees as a blur); for reduced motion it tracks
  * the peak displacement envelope instead of the oscillation.
  */
+import type { BowSpec } from '../physics/bow.ts';
 import type { HammerSpec, PluckSpec } from '../physics/excitation.ts';
 import type { StringParams } from '../physics/materials.ts';
 import { Voice, type OutputSettings } from '../physics/voice.ts';
@@ -17,10 +18,11 @@ const BLUR_SHAPES = 12;
 /** Hammer rest position below the string (m) used for the approach animation. */
 export const HAMMER_REST = 0.0012;
 
-export function slowFactorFor(f1: number): number {
+/** Slow-motion factor that shows the fundamental at about `apparentHz` cycles per second. */
+export function slowFactorFor(f1: number, apparentHz = TARGET_APPARENT_HZ): number {
   let best = SLOW_FACTORS[0];
   for (const s of SLOW_FACTORS) {
-    if (Math.abs(f1 / s - TARGET_APPARENT_HZ) < Math.abs(f1 / best - TARGET_APPARENT_HZ)) best = s;
+    if (Math.abs(f1 / s - apparentHz) < Math.abs(f1 / best - apparentHz)) best = s;
   }
   return best;
 }
@@ -42,6 +44,11 @@ export class PictureEngine {
   hammer: number | null = null;
   private hammerVelocity = 0;
   private acc = 0;
+  /** Simulated (physical) time of the picture, s. */
+  private time = 0;
+  /** The picture keeps bowing until this physical time, so Helmholtz motion has time to form. */
+  private bowUntil = 0;
+  private bowReleasePending = false;
   private resting = true;
 
   constructor(readonly sampleRate: number) {
@@ -87,6 +94,29 @@ export class PictureEngine {
     this.resting = false;
   }
 
+  bow(params: StringParams, spec: BowSpec, output: OutputSettings, minPeriods = 12): void {
+    this.cancelStrike();
+    this.voice.bowStart(params, spec, output);
+    this.afterExcite();
+    const f0 = this.voice.physics?.f0 ?? 100;
+    this.bowUntil = this.time + minPeriods / f0;
+    this.bowReleasePending = false;
+  }
+
+  /**
+   * Lifts the drawn bow, but not before a dozen periods of simulated time: in slow motion a
+   * short stroke would otherwise end before the stick-slip cycle becomes visible.
+   */
+  releaseBow(): void {
+    if (this.time >= this.bowUntil) this.voice.releaseBow();
+    else this.bowReleasePending = true;
+  }
+
+  /** True while the bow is on the string (for the drawing). */
+  get bowing(): boolean {
+    return this.voice.bow?.pressed ?? false;
+  }
+
   strike(params: StringParams, spec: HammerSpec, output: OutputSettings): void {
     // The physics starts at contact; before that the hammer flies up from its rest position.
     this.voice.stop();
@@ -125,6 +155,11 @@ export class PictureEngine {
   /** Advances the picture by `dt` seconds of display time. */
   tick(dt: number, mode: PictureMode): void {
     const physical = mode === 'slow' ? dt / this.slowFactor : dt;
+    this.time += physical;
+    if (this.bowReleasePending && this.time >= this.bowUntil) {
+      this.bowReleasePending = false;
+      this.voice.releaseBow();
+    }
     this.stepHammerApproach(physical);
     if (this.voice.mode === 'hold') {
       this.ensureBuffers();

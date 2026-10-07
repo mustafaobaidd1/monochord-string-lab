@@ -14,10 +14,12 @@ import {
 } from '../physics/materials.ts';
 import {
   DEFAULT_PRESET_ID,
+  bowSpec,
   hammerSpec,
   pluckSpec,
   presetById,
   presetString,
+  type BowSettings,
   type ExcitationKind,
   type PluckSettings,
   type Preset,
@@ -40,6 +42,7 @@ export interface AppState {
   excitation: ExcitationKind;
   pluck: PluckSettings;
   strike: StrikeSettings;
+  bow: BowSettings;
   output: { kind: OutputKind; pickupFromBridge: number };
   volume: number;
   muted: boolean;
@@ -55,6 +58,7 @@ export function stateForPreset(preset: Preset, previous?: AppState): AppState {
     excitation: preset.excitation,
     pluck: { ...preset.pluck },
     strike: { ...preset.strike },
+    bow: { fromBridge: 0.1, pressure: 1, velocity: 0.1 },
     output: {
       kind: previous?.output.kind ?? 'bridge',
       pickupFromBridge: preset.pickupFromBridge,
@@ -154,6 +158,17 @@ export function predictExcitation(state: AppState, sampleRate: number): Excitati
     const x0 = 1 - fromBridge;
     const w = state.pluck.width / state.string.length;
     raw = frequencies.map((_, i) => pluckOutputAmplitude(i + 1, x0, w, B, out, pickup));
+  } else if (state.excitation === 'bow') {
+    // Helmholtz motion: one corner circulating once per period, so the partials lock to exact
+    // multiples of f1 and the bridge force is a sawtooth (displacement 1/n^2, force 1/n).
+    fromBridge = state.bow.fromBridge;
+    const f1 = f0 * Math.sqrt(1 + B);
+    frequencies.splice(0, frequencies.length);
+    for (let n = 1; n * f1 <= Math.min(DISPLAY_MAX_HZ, nyquist * 0.95); n++)
+      frequencies.push(n * f1);
+    raw = frequencies.map((_, i) =>
+      out === 'bridge' ? 1 / (i + 1) : Math.abs(Math.sin((i + 1) * Math.PI * pickup)) / (i + 1),
+    );
   } else {
     fromBridge = state.strike.fromBridge;
     const { force, k } = strikeForceHistory(state.string, state.strike, sampleRate);
@@ -197,4 +212,4 @@ export function pitchLabel(f: number): string {
 
 export type Snapshot = ReturnType<typeof analyseSegment> & { windowSeconds: number };
 
-export { pluckSpec, hammerSpec };
+export { bowSpec, pluckSpec, hammerSpec };

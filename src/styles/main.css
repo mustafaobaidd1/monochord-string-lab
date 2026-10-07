@@ -2032,3 +2032,11 @@ kbd {
   line-height: 1.4;
   color: var(--ink-soft);
 }
+
+.primary.is-bowing {
+  background: var(--brass-deep);
+}
+
+.card--excite .segmented span {
+  padding-inline: 12px;
+}

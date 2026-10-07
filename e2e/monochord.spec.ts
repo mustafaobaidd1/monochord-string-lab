@@ -198,3 +198,31 @@ test('"How it works" renders the equations and the validation table', async ({ p
   await expect(page.locator('#how')).toContainText('Validation');
   await expect(page.locator('#how .how-table').first()).toContainText('Pluck at L/3');
 });
+
+test('bowing settles into Helmholtz motion: exact harmonics at the plucked pitch', async ({
+  page,
+}) => {
+  await ready(page);
+  await page.locator('.chip[data-preset="violin-a4"]').click();
+  await measuredF0(page);
+  const n = await count(page);
+  await page.locator('.card--excite .segmented label', { hasText: 'Bow' }).click();
+  await expect(page.locator('#bow-panel')).toBeVisible();
+  await expect(page.locator('#excite-label')).toHaveText('Hold to bow');
+  // Selecting Bow plays a 1.6 s stroke; the measurement starts once the stick-slip cycle settles.
+  const f0 = await measuredF0(page, n);
+  expect(Math.abs(1200 * Math.log2(f0 / 440))).toBeLessThan(15);
+  await expect(page.locator('#spectrum-notes')).toContainText('Bowed');
+  await expect(page.locator('#spectrum-status')).toContainText('Helmholtz motion');
+  // Holding the button keeps bowing until it is released.
+  const button = page.locator('#excite');
+  await button.scrollIntoViewIfNeeded();
+  const box = (await button.boundingBox())!;
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+  await page.mouse.down();
+  await expect(button).toHaveClass(/is-bowing/);
+  await page.waitForTimeout(2000);
+  await expect(button).toHaveClass(/is-bowing/);
+  await page.mouse.up();
+  await expect(button).not.toHaveClass(/is-bowing/);
+});

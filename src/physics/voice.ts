@@ -7,6 +7,7 @@ import { designGrid, type Grid } from './grid.ts';
 import { deriveString, type StringParams, type StringPhysics } from './materials.ts';
 import { StiffString } from './scheme.ts';
 import { Hammer, staticDeflection, type HammerSpec, type PluckSpec } from './excitation.ts';
+import { Bow, type BowSpec } from './bow.ts';
 import type { OutputKind } from './theory.ts';
 
 export interface OutputSettings {
@@ -43,6 +44,9 @@ export class Voice {
   /** True when the voice has been muted to make room for a new note. */
   muted = false;
   hammer: Hammer | null = null;
+  bow: Bow | null = null;
+  /** The current note was bowed (selects the loudness normalisation). */
+  private bowed = false;
   output: OutputSettings = { kind: 'bridge', pickup: 0.8 };
   /** Samples rendered since the excitation started. */
   age = 0;
@@ -84,7 +88,13 @@ export class Voice {
   }
 
   private updateGain(): void {
-    if (this.physics && this.params) {
+    if (!this.physics || !this.params) return;
+    if (this.bowed) {
+      // Helmholtz motion makes a bridge-force sawtooth of amplitude about Z0 v_B / beta; normalise
+      // to the reference bow (0.1 m/s at beta = 0.1), so faster or nearer-the-bridge bowing is louder.
+      const z0 = Math.sqrt(this.params.tension * this.physics.mu);
+      this.gain = this.output.kind === 'bridge' ? 0.32 / z0 : 0.6;
+    } else {
       this.gain = outputGain(this.physics, this.params, this.output.kind);
     }
   }
@@ -100,6 +110,8 @@ export class Voice {
     this.quiet = 0;
     this.muted = false;
     this.hammer = null;
+    this.bow = null;
+    this.bowed = false;
   }
 
   /** Releases a plucked string from rest in the static shape of `spec`. */
@@ -153,6 +165,25 @@ export class Voice {
     this.dcY = 0;
   }
 
+  /** Starts bowing a string at rest; the bow stays on until `releaseBow`. */
+  bowStart(params: StringParams, spec: BowSpec, output: OutputSettings): void {
+    this.output = { ...output };
+    const s = this.build(params);
+    this.begin();
+    s.clear();
+    this.bow = new Bow(s, spec);
+    this.mode = 'free';
+    this.dcX = 0;
+    this.dcY = 0;
+    this.bowed = true;
+    this.updateGain();
+  }
+
+  /** Lifts the bow; the string then rings freely. */
+  releaseBow(): void {
+    this.bow?.release();
+  }
+
   /** Damps the voice quickly (a finger touching the string, or the next note taking over). */
   mute(): void {
     if (this.mode === 'idle' || !this.string || this.muted) return;
@@ -162,12 +193,14 @@ export class Voice {
     }
     this.muted = true;
     this.hammer = null;
+    this.bow = null;
     this.string.setSigma0(this.string.sigma0 + MUTE_SIGMA);
   }
 
   stop(): void {
     this.mode = 'idle';
     this.hammer = null;
+    this.bow = null;
     this.string?.clear();
   }
 
@@ -197,6 +230,10 @@ export class Voice {
       this.hammer.interact(s);
       if (this.hammer.retired) this.hammer = null;
     }
+    if (this.bow) {
+      this.bow.interact(s);
+      if (this.bow.finished) this.bow = null;
+    }
     s.commit();
     this.age++;
     const raw = this.output.kind === 'bridge' ? s.bridgeForce() : s.velocityAt(this.output.pickup);
@@ -224,7 +261,7 @@ export class Voice {
       this.stop();
       return;
     }
-    if (this.mode === 'free' && !this.hammer) {
+    if (this.mode === 'free' && !this.hammer && !this.bow) {
       // A muted voice is gone once it is 70 dB down; a ringing one when it falls below -110 dB.
       const threshold = this.muted ? 3e-4 : 3e-6;
       if (level < threshold) this.quiet += count;

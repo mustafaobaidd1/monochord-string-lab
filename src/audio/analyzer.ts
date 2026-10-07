@@ -23,6 +23,8 @@ export interface AnalysisContext {
   f0: number;
   /** Anything the page wants back with the snapshot. */
   tag: number;
+  /** Seconds to skip after the onset before measuring (a bow needs time to settle). */
+  startDelay?: number;
 }
 
 export interface PartialReading {
@@ -211,9 +213,10 @@ export class Analyzer {
     if (!p) return;
     const seconds = Math.min(1.2, Math.max(0.35, 40 / p.context.f0));
     const n = Math.round(seconds * this.sampleRate);
-    if (this.writeFrame < p.frame + n) return;
+    const start = p.frame + Math.round((p.context.startDelay ?? 0) * this.sampleRate);
+    if (this.writeFrame < start + n) return;
     this.pending = null;
-    const segment = this.read(p.frame + n, n);
+    const segment = this.read(start + n, n);
     const snapshot = analyseSegment(segment, this.sampleRate, p.context);
     this.onSnapshot?.({ ...snapshot, windowSeconds: seconds });
   }

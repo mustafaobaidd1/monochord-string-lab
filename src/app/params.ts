@@ -4,6 +4,7 @@
  */
 import { MIN_POINTS, maxKappa, maxSigma1 } from '../physics/grid.ts';
 import { MATERIALS } from '../physics/materials.ts';
+import { playableBowForce, presetById } from '../physics/presets.ts';
 import { t60AtFrequency } from '../physics/theory.ts';
 import { hz, mm, ratio, sci, sig3 } from './format.ts';
 import { pitchLabel, stringInfo, type AppState, type StringInfo } from './state.ts';
@@ -299,6 +300,58 @@ export const PARAMS: ParamDef[] = [
       end === 'min'
         ? 'Nearly linear felt (p ≈ 1.5).'
         : 'Strongly hardening felt; fits to real piano hammers give p ≈ 2–4.3.',
+  },
+  {
+    key: 'bow.fromBridge',
+    label: 'Bow position',
+    scale: 'linear',
+    range: () => [0.04, 0.5],
+    get: (s) => s.bow.fromBridge,
+    set: (s, v) => (s.bow.fromBridge = v),
+    format: (v, ctx) => `${mm(v * ctx.state.string.length)} from the bridge · β = ${v.toFixed(2)}`,
+    spoken: (v) => `beta ${v.toFixed(2)} of the length from the bridge`,
+    limit: (end) =>
+      end === 'min'
+        ? 'Right at the bridge (sul ponticello) the bow needs far more force and the tone turns glassy.'
+        : 'At the middle of the string the string sticks for only half of each period; players stay between about β = 0.04 and 0.2.',
+  },
+  {
+    key: 'bow.pressure',
+    label: 'Bow force',
+    scale: 'log',
+    range: () => [0.15, 4],
+    get: (s) => s.bow.pressure,
+    set: (s, v) => (s.bow.pressure = v),
+    format: (v, ctx) => {
+      const f =
+        playableBowForce(presetById(ctx.state.presetId), ctx.state.string, ctx.state.bow.velocity) *
+        v;
+      return `${sig3(f)} N · ×${v.toFixed(2)} of the middle`;
+    },
+    spoken: (v, ctx) => {
+      const f =
+        playableBowForce(presetById(ctx.state.presetId), ctx.state.string, ctx.state.bow.velocity) *
+        v;
+      return `${sig3(f)} newtons`;
+    },
+    limit: (end) =>
+      end === 'min'
+        ? 'Below Schelleng’s minimum force the bow slips more than once per period: a thin, airy “surface” sound.'
+        : 'Above Schelleng’s maximum the string sticks too long: the pitch flattens and the tone turns raucous.',
+  },
+  {
+    key: 'bow.velocity',
+    label: 'Bow speed',
+    scale: 'log',
+    range: () => [0.03, 0.4],
+    get: (s) => s.bow.velocity,
+    set: (s, v) => (s.bow.velocity = v),
+    format: (v) => `${v.toFixed(v < 0.1 ? 3 : 2)} m/s`,
+    spoken: (v) => `${v.toFixed(2)} metres per second`,
+    limit: (end) =>
+      end === 'min'
+        ? 'A very slow bow: quiet, and easily choked by too much force.'
+        : 'A fast bow: loud; the force has to rise with the speed to keep the string sticking.',
   },
   {
     key: 'output.pickupFromBridge',

@@ -162,6 +162,7 @@
               <label
                 ><input type="radio" name="excitation" value="strike" /><span>Strike</span></label
               >
+              <label><input type="radio" name="excitation" value="bow" /><span>Bow</span></label>
             </div>
           </header>
           <div class="fraction-row">
@@ -215,6 +216,11 @@
             <div class="field" data-param="strike.mass"></div>
             <div class="field" data-param="strike.q0"></div>
             <div class="field" data-param="strike.exponent"></div>
+          </div>
+          <div class="excite-panel" id="bow-panel" hidden>
+            <div class="field" data-param="bow.fromBridge"></div>
+            <div class="field" data-param="bow.pressure"></div>
+            <div class="field" data-param="bow.velocity"></div>
           </div>
           <button class="primary" id="excite" type="button">
             <span id="excite-label">Pluck</span>

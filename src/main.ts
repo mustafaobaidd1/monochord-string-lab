@@ -25,7 +25,7 @@ import {
 } from './app/state.ts';
 import { midiToFrequency, parseNote } from './dsp/notes.ts';
 import { MATERIALS, linearDensity, tensionForFrequency } from './physics/materials.ts';
-import { hammerSpec, pluckSpec, presetById } from './physics/presets.ts';
+import { bowSpec, hammerSpec, pluckSpec, presetById } from './physics/presets.ts';
 import { Controls } from './ui/controls.ts';
 import { Keyboard } from './ui/keyboard.ts';
 import { noteReadout, renderStretch, renderTension, type TensionModel } from './ui/charts.ts';
@@ -128,11 +128,17 @@ const controls = new Controls({
   exciteAt: (fromBridge) => {
     void engine.start();
     if (state.excitation === 'pluck') update({ pluck: { ...state.pluck, fromBridge } });
+    else if (state.excitation === 'bow') update({ bow: { ...state.bow, fromBridge } });
     else update({ strike: { ...state.strike, fromBridge } });
     excite();
   },
   excite: () => {
     void engine.start();
+    // A pointer hold on the button has already bowed; ignore the click that follows it.
+    if (state.excitation === 'bow' && suppressBowClick) {
+      suppressBowClick = false;
+      return;
+    }
     excite();
   },
   toggleMute: () => {
@@ -145,7 +151,19 @@ const controls = new Controls({
   },
 });
 
-const keyboard = new Keyboard($('keyboard'), (midi) => playNote(midi), $('keyboard-note'));
+const keyboard = new Keyboard(
+  $('keyboard'),
+  (midi, hold) => playNote(midi, hold),
+  $('keyboard-note'),
+  () => stopBow(),
+);
+
+/** Where the current excitation acts, as a fraction of the length from the bridge. */
+function excitePointOf(s: AppState): number {
+  if (s.excitation === 'pluck') return s.pluck.fromBridge;
+  if (s.excitation === 'bow') return s.bow.fromBridge;
+  return s.strike.fromBridge;
+}
 
 // ------------------------------------------------------------------ state
 
@@ -176,21 +194,27 @@ function render(): void {
     length: state.string.length,
     ends: preset.ends,
     excitation: state.excitation,
-    excitePoint: state.excitation === 'pluck' ? state.pluck.fromBridge : state.strike.fromBridge,
+    excitePoint: excitePointOf(state),
     pickup: state.output.kind === 'pickup' ? state.output.pickupFromBridge : null,
     material: state.string.material,
     diameter: state.string.diameter,
-    displayAmplitude: preset.excitation === 'strike' ? 0.0012 : preset.pluck.amplitude,
+    displayAmplitude:
+      state.excitation === 'bow'
+        ? helmholtzAmplitude(state)
+        : preset.excitation === 'strike'
+          ? 0.0012
+          : preset.pluck.amplitude,
   });
   const target = $('string-target');
-  const point = state.excitation === 'pluck' ? state.pluck.fromBridge : state.strike.fromBridge;
+  const point = excitePointOf(state);
   target.setAttribute('aria-valuenow', String(Math.round(point * 100)));
   target.setAttribute(
     'aria-valuetext',
     `${Math.round(point * state.string.length * 1000)} millimetres from the bridge, ${ratio(point)}`,
   );
   const f1 = physics.f0 * Math.sqrt(1 + physics.B);
-  picture.slowFactor = slowFactorFor(f1);
+  // Bowing is shown less slowed down, so the circulating Helmholtz corner reads as motion.
+  picture.slowFactor = slowFactorFor(f1, state.excitation === 'bow' ? 4 : undefined);
   const slow = $('slowmo') as HTMLInputElement;
   slow.checked = state.slowMotion;
   $('slowmo-factor').textContent = state.slowMotion ? `×${picture.slowFactor}` : '';
@@ -229,7 +253,7 @@ function renderStretchChart(): void {
 
 /** Keeps the "drag the string" hint just above the string at the excitation point. */
 function placeHint(): void {
-  const point = state.excitation === 'pluck' ? state.pluck.fromBridge : state.strike.fromBridge;
+  const point = excitePointOf(state);
   const band = $('string-band');
   const x = stringView.xOfFromBridge(point);
   const y =
@@ -238,6 +262,15 @@ function placeHint(): void {
   if (x > 0) band.style.setProperty('--hint-x', `${x}px`);
   band.style.setProperty('--hint-y', `${Math.max(0, y - 70)}px`);
   $('stage-hint').classList.toggle('stage-hint--right', x < band.clientWidth * 0.42);
+}
+
+/**
+ * Mid-string amplitude of ideal Helmholtz motion, v_B / (8 beta f0): the drawing scale for a
+ * bowed string, whose motion is much smaller than a typical pluck.
+ */
+function helmholtzAmplitude(s: AppState): number {
+  const f0 = stringInfo(s.string, engine.sampleRate).physics.f0;
+  return Math.max(2e-5, s.bow.velocity / (8 * Math.max(0.04, s.bow.fromBridge) * f0));
 }
 
 /** Keeps the note when the material or gauge changes (a player would retune). */
@@ -296,12 +329,14 @@ function updateKeyboard(): void {
 
 let tensionModel: TensionModel | null = null;
 
-function playNote(midi: number): void {
+function playNote(midi: number, hold = false): void {
   void engine.start();
   const s = { ...state.string };
   s.tension = tensionForFrequency(linearDensity(s), s.length, midiToFrequency(midi));
   update({ string: s, customised: true });
-  excite();
+  // In bow mode a held key keeps bowing until it is released.
+  if (state.excitation === 'bow' && hold) startBow();
+  else excite();
   if (tensionModel) {
     renderTension($('tension-chart'), tensionModel, midi);
     $('note-readout').innerHTML = noteReadout(midi, s.tension, tensionModel.breakingLoad);
@@ -312,6 +347,9 @@ function moveExcitePoint(delta: number): void {
   if (state.excitation === 'pluck') {
     const fromBridge = Math.min(0.98, Math.max(0.02, state.pluck.fromBridge + delta));
     update({ pluck: { ...state.pluck, fromBridge } });
+  } else if (state.excitation === 'bow') {
+    const fromBridge = Math.min(0.5, Math.max(0.04, state.bow.fromBridge + delta));
+    update({ bow: { ...state.bow, fromBridge } });
   } else {
     const fromBridge = Math.min(0.98, Math.max(0.02, state.strike.fromBridge + delta));
     update({ strike: { ...state.strike, fromBridge } });
@@ -338,6 +376,8 @@ function expect(p: ExcitationPrediction): void {
     predictedAmplitude: p.amplitudes.slice(0, 16),
     f0: p.f0,
     tag: p.tag,
+    // Measure a bowed note once the stick-slip cycle has settled.
+    startDelay: p.kind === 'bow' ? 0.25 : 0,
   });
   spectrumView.setPrediction(p);
   renderNotes(p);
@@ -349,9 +389,10 @@ function expect(p: ExcitationPrediction): void {
 function renderNotes(p: ExcitationPrediction): void {
   const items: string[] = [];
   const list = (ns: number[]) => `${ns.slice(0, 3).join(', ')}${ns.length > 3 ? ' …' : ''}`;
-  const byExcitation = p.missing.filter(
-    (n) => Math.abs(Math.sin(n * Math.PI * p.fromBridge)) < 1e-6,
-  );
+  const byExcitation =
+    p.kind === 'bow'
+      ? []
+      : p.missing.filter((n) => Math.abs(Math.sin(n * Math.PI * p.fromBridge)) < 1e-6);
   const byPickup = p.missing.filter((n) => !byExcitation.includes(n));
   if (byExcitation.length) {
     const verb = p.kind === 'pluck' ? 'plucked' : 'struck';
@@ -364,8 +405,13 @@ function renderNotes(p: ExcitationPrediction): void {
       `<li class="note-comb"><span class="glyph" aria-hidden="true">×</span>Partials ${list(byPickup)} silent at the pickup (${ratio(p.pickupFromBridge)})</li>`,
     );
   }
+  if (p.kind === 'bow') {
+    items.unshift(
+      `<li class="note-stretch"><span class="glyph" aria-hidden="true">≡</span>Bowed: the stick–slip cycle locks the partials to exact multiples of <i>f</i><sub>1</sub> (Helmholtz motion), however stiff the string</li>`,
+    );
+  }
   const n = Math.min(20, p.frequencies.length);
-  if (n >= 4) {
+  if (n >= 4 && p.kind !== 'bow') {
     const stretch = 1200 * Math.log2(p.frequencies[n - 1] / (n * p.f0));
     if (stretch >= 5) {
       items.push(
@@ -380,8 +426,50 @@ function renderNotes(p: ExcitationPrediction): void {
   $('spectrum-notes').innerHTML = items.join('');
 }
 
+/** Duration of a bow stroke started by a click (a held button or key bows for as long as held). */
+const BOW_STROKE_MS = 1600;
+let bowId = 0;
+let bowTimer = 0;
+let bowing = false;
+let suppressBowClick = false;
+
+function startBow(autoReleaseMs = 0): void {
+  window.clearTimeout(bowTimer);
+  window.clearTimeout(exciteTimer);
+  const info = stringInfo(state.string, engine.sampleRate);
+  if (!info.grid) {
+    toast(`This string cannot be simulated stably: ${info.error}`);
+    return;
+  }
+  expect(predictExcitation(state, engine.sampleRate));
+  const output = outputSettings(state);
+  const spec = bowSpec(presetOf(state), state.string, state.bow);
+  bowId++;
+  engine.send({ type: 'bow', id: bowId, params: state.string, spec, output });
+  picture.bow(state.string, spec, output);
+  bowing = true;
+  $('excite').classList.add('is-bowing');
+  stringDirty = true;
+  if (autoReleaseMs > 0) bowTimer = window.setTimeout(() => stopBow(), autoReleaseMs);
+}
+
+function stopBow(): void {
+  window.clearTimeout(bowTimer);
+  if (!bowing) return;
+  bowing = false;
+  $('excite').classList.remove('is-bowing');
+  engine.send({ type: 'bowRelease', id: bowId });
+  picture.releaseBow();
+  stringDirty = true;
+}
+
 function excite(): void {
   window.clearTimeout(exciteTimer);
+  if (state.excitation === 'bow') {
+    startBow(BOW_STROKE_MS);
+    return;
+  }
+  stopBow();
   const info = stringInfo(state.string, engine.sampleRate);
   if (!info.grid) {
     toast(`This string cannot be simulated stably: ${info.error}`);
@@ -412,6 +500,7 @@ function onGrab(x: number, amplitude: number): void {
   holding = true;
   holdId++;
   grab = { x, amplitude };
+  stopBow();
   if (state.excitation !== 'pluck') update({ excitation: 'pluck' });
   const output = outputSettings(state);
   engine.send({
@@ -496,6 +585,23 @@ function onSnapshot(s: Snapshot): void {
   const dev = 1200 * Math.log2(f / predicted1);
   const suppressed = s.partials.filter((p) => p.suppressed).map((p) => p.n);
   let text = `Measured f₁ = ${hz(f)} (${pitchLabel(f)}), ${Math.abs(dev).toFixed(2)} ¢ from theory.`;
+  if (prediction.kind === 'bow') {
+    const devs = s.partials
+      .slice(0, 8)
+      .filter((p) => p.measured && !p.suppressed)
+      .map((p) => Math.abs(1200 * Math.log2(p.measured! / (p.n * f))));
+    const worst = devs.length ? Math.max(...devs) : NaN;
+    text = `Bowed: f₁ = ${hz(f)} (${pitchLabel(f)}), ${dev >= 0 ? '+' : '−'}${Math.abs(dev).toFixed(1)} ¢ from the plucked pitch.`;
+    if (Number.isFinite(worst)) {
+      text +=
+        worst < 1
+          ? ` Partials 1–8 sit within ${worst.toFixed(2)} ¢ of exact harmonics: Helmholtz motion.`
+          : ` Partials 1–8 stray up to ${worst.toFixed(1)} ¢ from exact harmonics: the stick–slip cycle is not settled (try another force or speed).`;
+    }
+    $('spectrum-status').textContent = text;
+    $('spectrum-canvas').setAttribute('aria-label', `Spectrum and waterfall. ${text}`);
+    return;
+  }
   if (suppressed.length) {
     const causes = [
       `${prediction.kind === 'pluck' ? 'pluck' : 'strike'} at ${ratio(Math.min(prediction.fromBridge, 1 - prediction.fromBridge))}`,
@@ -574,6 +680,60 @@ let userTouchedMotion = false;
 });
 $('pause').addEventListener('click', () => update({ paused: !state.paused }));
 
+{
+  const button = $('excite');
+  let pointerBow = false;
+  let keyBow = false;
+  button.addEventListener('pointerdown', (e) => {
+    if (state.excitation !== 'bow' || e.button !== 0) return;
+    e.preventDefault();
+    void engine.start();
+    pointerBow = true;
+    try {
+      button.setPointerCapture(e.pointerId);
+    } catch {
+      // Not capturable (synthetic events); releasing still ends the stroke.
+    }
+    startBow();
+  });
+  const endPointerBow = () => {
+    if (!pointerBow) return;
+    pointerBow = false;
+    suppressBowClick = true;
+    stopBow();
+  };
+  button.addEventListener('pointerup', endPointerBow);
+  button.addEventListener('pointercancel', endPointerBow);
+  button.addEventListener('keydown', (e) => {
+    if (state.excitation !== 'bow' || (e.key !== ' ' && e.key !== 'Enter')) return;
+    e.preventDefault();
+    if (e.repeat || keyBow) return;
+    void engine.start();
+    keyBow = true;
+    startBow();
+  });
+  button.addEventListener('keyup', (e) => {
+    if (!keyBow || (e.key !== ' ' && e.key !== 'Enter')) return;
+    e.preventDefault();
+    keyBow = false;
+    stopBow();
+  });
+  button.addEventListener('blur', () => {
+    if (keyBow) {
+      keyBow = false;
+      stopBow();
+    }
+  });
+}
+
+let spaceBow = false;
+document.addEventListener('keyup', (e) => {
+  if (e.code === 'Space' && spaceBow) {
+    spaceBow = false;
+    stopBow();
+  }
+});
+
 document.addEventListener('keydown', (e) => {
   if (e.code !== 'Space' || e.repeat || e.ctrlKey || e.metaKey || e.altKey) return;
   const t = e.target as HTMLElement;
@@ -585,7 +745,10 @@ document.addEventListener('keydown', (e) => {
     return;
   e.preventDefault();
   void engine.start();
-  excite();
+  if (state.excitation === 'bow') {
+    spaceBow = true;
+    startBow();
+  } else excite();
 });
 
 // ------------------------------------------------------------------ toast
@@ -620,6 +783,7 @@ function frame(now: number): void {
       envelope: mode === 'envelope' ? picture.envelope : null,
       mode,
       hammer: picture.hammer,
+      bowing: picture.bowing,
       grab,
     });
   }

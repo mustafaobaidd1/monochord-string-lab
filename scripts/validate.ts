@@ -4,7 +4,13 @@
  * into the README) and prints a Markdown summary.
  */
 import { writeFileSync } from 'node:fs';
-import { estimateFundamental, measurePartials, spectrumOf } from '../src/dsp/analysis.ts';
+import {
+  estimateFundamental,
+  measurePartials,
+  peakInRange,
+  spectrumOf,
+} from '../src/dsp/analysis.ts';
+import { BOW_SHARPNESS, Bow } from '../src/physics/bow.ts';
 import { Hammer, staticDeflection } from '../src/physics/excitation.ts';
 import { MAX_POINTS, designGrid } from '../src/physics/grid.ts';
 import {
@@ -13,7 +19,7 @@ import {
   tensionForFrequency,
   type StringParams,
 } from '../src/physics/materials.ts';
-import { PRESETS, hammerSpec, presetString } from '../src/physics/presets.ts';
+import { PRESETS, hammerSpec, playableBowForce, presetString } from '../src/physics/presets.ts';
 import { StiffString } from '../src/physics/scheme.ts';
 import { cents, discreteMode, partialFrequency } from '../src/physics/theory.ts';
 
@@ -208,6 +214,68 @@ const hammer = PRESETS.map((preset) => {
   return { preset: preset.name, contactMs: round((h.contactSamples / FS) * 1000, 2), drift };
 });
 
+// 7. Bowing: Helmholtz motion at each preset's calibrated force (bow at L/10, 0.1 m/s).
+const bow = [
+  'violin-a4',
+  'nylon-e4',
+  'guitar-e4',
+  'harp-c4',
+  'guitar-e2',
+  'bass-e1',
+  'piano-a0',
+].map((id) => {
+  const preset = PRESETS.find((p) => p.id === id)!;
+  const params = presetString(preset);
+  const x = sim(params);
+  const beta = 0.1;
+  const velocity = 0.1;
+  const b = new Bow(x.s, {
+    position: 1 - beta,
+    force: playableBowForce(preset, params, velocity),
+    velocity,
+    width: 0.004,
+    sharpness: BOW_SHARPNESS,
+  });
+  const n = Math.round(FS * 1.5);
+  const out = new Float64Array(n);
+  const eta = new Float64Array(n);
+  for (let i = 0; i < n; i++) {
+    x.s.computeFree();
+    b.interact(x.s);
+    x.s.commit();
+    out[i] = x.s.bridgeForce();
+    eta[i] = b.relativeVelocity;
+  }
+  const f1 = x.physics.f0 * Math.sqrt(1 + x.physics.B);
+  const s = spectrumOf(out.subarray(Math.round(FS * 0.9)), FS, { zeroPad: 8 });
+  const peak = peakInRange(s, f1 * 0.9, f1 * 1.1)!;
+  const m = measurePartials(
+    s,
+    Array.from({ length: 8 }, (_, i) => (i + 1) * peak.frequency),
+  );
+  const harmonic = Math.max(...m.map((p) => Math.abs(cents(p.measured!, p.n * peak.frequency))));
+  const sawtooth = Math.max(
+    ...m.slice(1, 6).map((p) => Math.abs(p.level! - m[0].level! + 20 * Math.log10(p.n))),
+  );
+  const tail = eta.subarray(Math.round(FS * 0.9));
+  let stick = 0;
+  let slip = 0;
+  for (const v of tail) {
+    if (v > -0.05) stick++;
+    slip = Math.min(slip, v + velocity);
+  }
+  return {
+    preset: preset.name,
+    force: round(playableBowForce(preset, params, velocity), 3),
+    pitchCents: round(cents(peak.frequency, f1), 1),
+    harmonicCents: round(harmonic, 2),
+    sawtoothDb: round(sawtooth, 1),
+    stickFraction: round(stick / tail.length, 3),
+    slipVelocity: round(slip, 2),
+    idealSlip: round((-velocity * (1 - beta)) / beta, 2),
+  };
+});
+
 const results = {
   generated: new Date().toISOString().slice(0, 10),
   sampleRate: FS,
@@ -219,6 +287,7 @@ const results = {
   decay,
   stability,
   hammer,
+  bow,
 };
 writeFileSync('src/ui/validation-results.json', `${JSON.stringify(results, null, 2)}\n`);
 
@@ -248,6 +317,10 @@ md.push(
 );
 md.push(
   `| Hammer + string energy (lossless) | conserved | max drift ${Math.max(...hammer.map((h) => h.drift)).toExponential(1)} |`,
+  ...bow.map(
+    (b) =>
+      `| Bowed ${b.preset} (${b.force} N, L/10, 0.1 m/s) | Helmholtz motion: exact harmonics, sawtooth, stick ≈ 0.9 of the period, slip ≈ ${b.idealSlip} m/s | harmonics within ${b.harmonicCents} ¢; sawtooth within ${b.sawtoothDb} dB (n = 2–6); stick ${b.stickFraction}; slip ${b.slipVelocity} m/s; pitch ${b.pitchCents} ¢ |`,
+  ),
 );
 console.log(md.join('\n'));
 console.log('\nSpeed (Node, one voice):');

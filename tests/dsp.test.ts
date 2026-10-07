@@ -125,3 +125,35 @@ describe('notes', () => {
     expect(d.cents).toBeCloseTo(3, 6);
   });
 });
+
+describe('fundamental estimation is robust', () => {
+  const fs = 48000;
+  const tone = (parts: [number, number][], seconds = 0.5) =>
+    Float64Array.from({ length: Math.round(seconds * fs) }, (_, i) => {
+      const t = i / fs;
+      let v = 0;
+      for (const [f, a] of parts) v += a * Math.sin(2 * Math.PI * f * t);
+      return v;
+    });
+
+  it('ignores a weak stray peak below a strong harmonic series', () => {
+    const series: [number, number][] = [1, 2, 3, 4, 5, 6].map((n) => [260 * n, 1 / n]);
+    const s = spectrumOf(tone([...series, [124, 0.03]]), fs);
+    expect(estimateFundamental(s)!.frequency).toBeCloseTo(260, 1);
+  });
+
+  it('finds the fundamental when the even partials are missing (pluck at L/2)', () => {
+    const odd: [number, number][] = [1, 3, 5, 7].map((n) => [110 * n, 1 / n]);
+    expect(estimateFundamental(spectrumOf(tone(odd), fs))!.frequency).toBeCloseTo(110, 1);
+  });
+
+  it('finds the fundamental of a very stiff string (B = 0.05)', () => {
+    const B = 0.05;
+    const stiff: [number, number][] = [1, 2, 3, 4].map((n) => [
+      100 * n * Math.sqrt(1 + B * n * n),
+      1 / n,
+    ]);
+    const f1 = 100 * Math.sqrt(1 + B);
+    expect(estimateFundamental(spectrumOf(tone(stiff), fs))!.frequency).toBeCloseTo(f1, 1);
+  });
+});

@@ -211,12 +211,24 @@ export class Controls {
     for (const input of document.querySelectorAll<HTMLInputElement>('input[name="output"]')) {
       input.checked = input.value === state.output.kind;
     }
-    const pluck = state.excitation === 'pluck';
-    $('pluck-panel').hidden = !pluck;
-    $('strike-panel').hidden = pluck;
-    $('excite-label').textContent = pluck ? 'Pluck' : 'Strike';
-    $('fraction-label').textContent = pluck ? 'Pluck at' : 'Strike at';
-    const current = pluck ? state.pluck.fromBridge : state.strike.fromBridge;
+    const kind = state.excitation;
+    $('pluck-panel').hidden = kind !== 'pluck';
+    $('strike-panel').hidden = kind !== 'strike';
+    $('bow-panel').hidden = kind !== 'bow';
+    $('excite-label').textContent =
+      kind === 'pluck' ? 'Pluck' : kind === 'strike' ? 'Strike' : 'Hold to bow';
+    $('fraction-label').textContent =
+      kind === 'pluck' ? 'Pluck at' : kind === 'strike' ? 'Strike at' : 'Bow at';
+    $('excite-note').textContent =
+      kind === 'bow'
+        ? 'Press and hold to bow; release to let the string ring. A click bows for 1.6 s.'
+        : '';
+    const current =
+      kind === 'pluck'
+        ? state.pluck.fromBridge
+        : kind === 'bow'
+          ? state.bow.fromBridge
+          : state.strike.fromBridge;
     for (const b of document.querySelectorAll<HTMLButtonElement>('#fractions button')) {
       const f = 1 / Number(b.dataset.fraction);
       b.setAttribute('aria-pressed', String(Math.abs(f - current) < 1e-6));

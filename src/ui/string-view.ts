@@ -10,7 +10,7 @@ import { fitCanvas, readTheme, type Theme } from './theme.ts';
 export interface StringScene {
   length: number;
   ends: { left: string; right: string };
-  excitation: 'pluck' | 'strike';
+  excitation: 'pluck' | 'strike' | 'bow';
   /** Excitation point, fraction of the length from the bridge. */
   excitePoint: number;
   /** Pickup position (fraction from the bridge) or null for the bridge-force output. */
@@ -28,6 +28,8 @@ export interface StringFrame {
   envelope: Float32Array | null;
   mode: PictureMode;
   hammer: number | null;
+  /** True while the bow is on the string. */
+  bowing: boolean;
   /** Finger position while the string is held (fraction from the nut, metres). */
   grab: { x: number; amplitude: number } | null;
 }
@@ -346,7 +348,7 @@ export class StringView {
     g.textAlign = ex > l.bridgeX - 60 ? 'right' : 'left';
     g.textBaseline = 'bottom';
     g.fillText(
-      s.excitation === 'pluck' ? 'PLUCK' : 'HAMMER',
+      s.excitation === 'pluck' ? 'PLUCK' : s.excitation === 'bow' ? 'BOW' : 'HAMMER',
       ex + (g.textAlign === 'right' ? -9 : 9),
       ry - 6,
     );
@@ -433,6 +435,8 @@ export class StringView {
       const flat = new Float32Array(2);
       this.drawCrisp(g, l, 1, flat, colors, thickness, s.material === 'wound');
     }
+
+    if (s.excitation === 'bow' && N > 0) this.drawBow(g, l, frame, th);
 
     if (frame.grab) {
       const gx = l.nutX + frame.grab.x * span;
@@ -561,6 +565,36 @@ export class StringView {
     g.globalAlpha = 1;
     const flat = new Float32Array(2);
     this.strokeShape(g, l, 1, flat, colors.core, thickness * 0.8);
+  }
+
+  /** The bow hair in section, riding on the string while bowing and lifted otherwise. */
+  private drawBow(g: CanvasRenderingContext2D, l: Layout, frame: StringFrame, th: Theme): void {
+    const s = this.scene!;
+    const span = l.bridgeX - l.nutX;
+    const x = l.bridgeX - s.excitePoint * span;
+    const N = frame.N;
+    const pos = (1 - s.excitePoint) * N;
+    const i = Math.min(N - 1, Math.max(0, Math.floor(pos)));
+    const t = pos - i;
+    const shape = frame.count > 0 ? frame.shapes[0] : null;
+    const u = shape ? (1 - t) * shape[i] + t * shape[i + 1] : 0;
+    const y = this.yOf(l, u);
+    const w = l.compact ? 7 : 9;
+    const h = l.compact ? 16 : 22;
+    const lift = frame.bowing ? 0 : l.compact ? 14 : 20;
+    g.save();
+    g.fillStyle = frame.bowing ? th.ink : th.paperLight;
+    g.strokeStyle = th.ink;
+    g.lineWidth = 1.2;
+    if (!frame.bowing) g.setLineDash([2, 2]);
+    roundRect(g, x - w / 2, y - h - 3 - lift, w, h, 2.5);
+    g.fill();
+    g.stroke();
+    g.setLineDash([]);
+    // Hair ribbon edge in rosin colour.
+    g.fillStyle = th.brassLight;
+    g.fillRect(x - w / 2 + 1.5, y - 5 - lift, w - 3, 2);
+    g.restore();
   }
 
   private drawHammer(g: CanvasRenderingContext2D, l: Layout, frame: StringFrame, th: Theme): void {

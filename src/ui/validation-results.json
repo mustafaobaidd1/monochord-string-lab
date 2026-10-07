@@ -115,7 +115,7 @@
       "stabilityNumber": 0.9825,
       "hOverHmin": 1.005397,
       "maxOverInitial": 0.998,
-      "msPerSecond": 59.2
+      "msPerSecond": 33.2
     },
     {
       "preset": "Guitar E4",
@@ -123,7 +123,7 @@
       "stabilityNumber": 0.9808,
       "hOverHmin": 1.009459,
       "maxOverInitial": 0.992,
-      "msPerSecond": 24.4
+      "msPerSecond": 15
     },
     {
       "preset": "Classical nylon",
@@ -131,7 +131,7 @@
       "stabilityNumber": 0.9897,
       "hOverHmin": 1.004791,
       "maxOverInitial": 0.984,
-      "msPerSecond": 26.5
+      "msPerSecond": 11.6
     },
     {
       "preset": "Bass guitar E1",
@@ -139,7 +139,7 @@
       "stabilityNumber": 0.9967,
       "hOverHmin": 1.000879,
       "maxOverInitial": 1,
-      "msPerSecond": 66.1
+      "msPerSecond": 40.4
     },
     {
       "preset": "Piano A0",
@@ -147,7 +147,7 @@
       "stabilityNumber": 0.9947,
       "hOverHmin": 1.001425,
       "maxOverInitial": 1,
-      "msPerSecond": 108.3
+      "msPerSecond": 49.2
     },
     {
       "preset": "Harp C4",
@@ -155,7 +155,7 @@
       "stabilityNumber": 0.9985,
       "hOverHmin": 1.000547,
       "maxOverInitial": 0.99,
-      "msPerSecond": 23.2
+      "msPerSecond": 14.7
     },
     {
       "preset": "Violin pizzicato",
@@ -163,7 +163,7 @@
       "stabilityNumber": 0.9763,
       "hOverHmin": 1.010367,
       "maxOverInitial": 0.979,
-      "msPerSecond": 18.3
+      "msPerSecond": 9.4
     }
   ],
   "hammer": [
@@ -201,6 +201,78 @@
       "preset": "Violin pizzicato",
       "contactMs": 4,
       "drift": 1.9178331762188033e-13
+    }
+  ],
+  "bow": [
+    {
+      "preset": "Violin pizzicato",
+      "force": 0.17,
+      "pitchCents": 0.1,
+      "harmonicCents": 0.01,
+      "sawtoothDb": 0.1,
+      "stickFraction": 0.872,
+      "slipVelocity": -1.18,
+      "idealSlip": -0.9
+    },
+    {
+      "preset": "Classical nylon",
+      "force": 0.16,
+      "pitchCents": -0.5,
+      "harmonicCents": 0,
+      "sawtoothDb": 0.3,
+      "stickFraction": 0.882,
+      "slipVelocity": -1.04,
+      "idealSlip": -0.9
+    },
+    {
+      "preset": "Guitar E4",
+      "force": 0.12,
+      "pitchCents": -0.9,
+      "harmonicCents": 0,
+      "sawtoothDb": 0.2,
+      "stickFraction": 0.883,
+      "slipVelocity": -1.03,
+      "idealSlip": -0.9
+    },
+    {
+      "preset": "Harp C4",
+      "force": 0.75,
+      "pitchCents": -6.3,
+      "harmonicCents": 0.1,
+      "sawtoothDb": 0.4,
+      "stickFraction": 0.869,
+      "slipVelocity": -1.34,
+      "idealSlip": -0.9
+    },
+    {
+      "preset": "Guitar E2",
+      "force": 1.4,
+      "pitchCents": -9.1,
+      "harmonicCents": 0.23,
+      "sawtoothDb": 1.2,
+      "stickFraction": 0.879,
+      "slipVelocity": -1.85,
+      "idealSlip": -0.9
+    },
+    {
+      "preset": "Bass guitar E1",
+      "force": 4.2,
+      "pitchCents": -6.8,
+      "harmonicCents": 3.54,
+      "sawtoothDb": 2.5,
+      "stickFraction": 0.874,
+      "slipVelocity": -1.97,
+      "idealSlip": -0.9
+    },
+    {
+      "preset": "Piano A0",
+      "force": 27,
+      "pitchCents": -8.3,
+      "harmonicCents": 2.78,
+      "sawtoothDb": 1.7,
+      "stickFraction": 0.885,
+      "slipVelocity": -1.91,
+      "idealSlip": -0.9
     }
   ]
 }

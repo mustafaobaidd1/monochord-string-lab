@@ -48,6 +48,13 @@ function validationTable(): string {
   rows.push(
     `<tr><td>Hammer and string together (lossless)</td><td>total energy conserved</td><td>max drift ${exp(Math.max(...r.hammer.map((h) => h.drift)))}</td><td>machine precision</td></tr>`,
   );
+  for (const b of r.bow.filter((x) =>
+    ['Violin pizzicato', 'Classical nylon', 'Guitar E4', 'Harp C4'].includes(x.preset),
+  )) {
+    rows.push(
+      `<tr><td>Bowed ${b.preset}, ${b.force} N at L/10, 0.1 m/s</td><td>Helmholtz motion</td><td>harmonics within ${b.harmonicCents} ¢; sawtooth within ${b.sawtoothDb} dB; sticks ${(b.stickFraction * 100).toFixed(0)} % of the time; slips at ${b.slipVelocity} m/s (ideal ${b.idealSlip})</td><td>locked, 1/n</td></tr>`,
+    );
+  }
   return `<div class="how-table" tabindex="0" role="region" aria-label="Validation results"><table>
     <thead><tr><th scope="col">Check</th><th scope="col">Reference</th><th scope="col">Measured</th><th scope="col">Target</th></tr></thead>
     <tbody>${rows.join('')}</tbody></table></div>`;
@@ -129,7 +136,23 @@ export function renderHow(root: HTMLElement): void {
     </section>
 
     <section>
-      <h3>5 · The finite-difference scheme</h3>
+      <h3>5 · Bowing</h3>
+      <p>The bow presses with force ${t('F')} and moves at speed ${t('v_B')}; friction depends on the slip
+      ${t('\\eta = u_t(x_B) - v_B')} through Bilbao's smooth characteristic</p>
+      ${T('F_{\\text{bow}} = -F\\,\\phi(\\eta),\\qquad \\phi(\\eta) = \\sqrt{2a}\\,\\eta\\,e^{-a\\eta^2 + 1/2}')}
+      <p>with ${t('a = 1000\\,\\text{s}^2/\\text{m}^2')} (friction peaks at a slip of 2 cm/s). Taking ${t('\\eta')} at the
+      centred time difference leaves one scalar equation per sample, solved by Newton iteration from the previous slip,
+      which follows the stick or slip branch. In the playable range the string settles into <strong>Helmholtz
+      motion</strong>: a single corner circulates once per period, the string sticks to the bow for about
+      ${t('1-\\beta')} of each period (${t('\\beta = x_B/L')}) and slips back at about ${t('-v_B(1-\\beta)/\\beta')}.
+      The partials then lock to exact multiples of ${t('f_1')}, however stiff the string, and the bridge force is a
+      sawtooth. Too little force and the bow slips more than once per period; too much and the pitch flattens and the
+      tone turns raucous (Schelleng's limits). The force slider is relative to a force found by simulation for each
+      preset and scaled as ${t('Z_0^{1.3}v_B')} (${t('Z_0 = \\sqrt{T\\mu}')}) for other strings.</p>
+    </section>
+
+    <section>
+      <h3>6 · The finite-difference scheme</h3>
       <p>On a grid ${t('x_l = lh')}, ${t('t_n = nk')} with ${t('k = 1/f_s')} (one step per audio sample), the scheme is</p>
       ${T('\\delta_{tt}u = c^2\\delta_{xx}u - \\kappa^2\\delta_{xxxx}u - 2\\sigma_0\\delta_{t\\cdot}u + 2\\sigma_1\\delta_{t-}\\delta_{xx}u')}
       <p>with centred ${t('\\delta_{t\\cdot}')} and backward ${t('\\delta_{t-}')} differences, which keeps it explicit.
@@ -145,7 +168,7 @@ export function renderHow(root: HTMLElement): void {
     </section>
 
     <section>
-      <h3>6 · From simulation to sound</h3>
+      <h3>7 · From simulation to sound</h3>
       <p>The scheme runs in an <strong>AudioWorklet</strong> at the audio sample rate. The output is the bridge force (or
       the pickup velocity), scaled by a per-string reference so different strings sound comparably loud, high-passed at
       4 Hz, then a master volume and a soft limiter. If AudioWorklet is missing, the same code runs on the main thread
@@ -157,7 +180,7 @@ export function renderHow(root: HTMLElement): void {
   </div>
 
   <section class="how-wide">
-    <h3>7 · Validation</h3>
+    <h3>8 · Validation</h3>
     <p>This is an <strong>educational simulation</strong>, not a calibrated model of any particular instrument. What has
     been validated is the numerics: the scheme reproduces the analytic results below (computed by
     <code>npm run validate</code> at ${results.sampleRate / 1000} kHz on ${results.generated}; the unit tests check the
@@ -170,7 +193,7 @@ export function renderHow(root: HTMLElement): void {
   </section>
 
   <section class="how-wide">
-    <h3>8 · Limitations</h3>
+    <h3>9 · Limitations</h3>
     <ul class="how-list">
       <li>Linear model: no tension modulation, so large plucks do not go sharp; no longitudinal or torsional waves and
       no phantom partials.</li>
@@ -183,7 +206,10 @@ export function renderHow(root: HTMLElement): void {
       <li>The explicit scheme has numerical dispersion (quantified above), and the grid is capped at
       ${results.maxPoints} intervals, which removes the very highest partials of long, slack strings.</li>
       <li>The felt is a lossless power law (no hysteresis); the pickup is a point velocity sensor with no aperture or
-      electrical resonance; there is no bow.</li>
+      electrical resonance.</li>
+      <li>The bow is a point contact with a smooth friction curve and no rosin thermodynamics, bow-hair width or torsion;
+      stiff strings (wound E2, bass, piano) lock only approximately, and above about the \${t('1/\\beta')}-th partial the
+      simulated spectrum falls below the ideal sawtooth because the Helmholtz corner is rounded.</li>
       <li>Loudness is normalised per string, not an absolute sound level.</li>
     </ul>
   </section>

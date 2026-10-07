@@ -61,17 +61,26 @@ export class Keyboard {
   private keys = new Map<number, HTMLButtonElement>();
   private octave = 0;
   private active: number | null = null;
+  private heldCode: string | null = null;
+  private heldPointer = -1;
   private readonly narrow = window.matchMedia('(max-width: 640px)');
 
   constructor(
     private readonly root: HTMLElement,
-    private readonly onPlay: (midi: number) => void,
+    private readonly onPlay: (midi: number, hold: boolean) => void,
     private readonly note: HTMLElement,
+    private readonly onStop: () => void = () => undefined,
   ) {
     document.getElementById('octave-down')!.addEventListener('click', () => this.setOctave(0));
     document.getElementById('octave-up')!.addEventListener('click', () => this.setOctave(1));
     this.narrow.addEventListener('change', () => this.applyOctave());
     document.addEventListener('keydown', (e) => this.onKey(e));
+    document.addEventListener('keyup', (e) => {
+      if (this.heldCode && e.code === this.heldCode) {
+        this.heldCode = null;
+        this.onStop();
+      }
+    });
   }
 
   setModel(model: KeyboardModel): void {
@@ -110,11 +119,20 @@ export class Keyboard {
       b.addEventListener('pointerdown', (e) => {
         if (e.button !== 0) return;
         e.preventDefault();
-        this.play(midi);
+        this.heldPointer = e.pointerId;
+        this.play(midi, true);
       });
+      const end = (e: PointerEvent) => {
+        if (e.pointerId !== this.heldPointer) return;
+        this.heldPointer = -1;
+        this.onStop();
+      };
+      b.addEventListener('pointerup', end);
+      b.addEventListener('pointerleave', end);
+      b.addEventListener('pointercancel', end);
       b.addEventListener('click', (e) => {
         // Keyboard activation (Enter / Space) arrives as a click with detail 0.
-        if (e.detail === 0) this.play(midi);
+        if (e.detail === 0) this.play(midi, false);
       });
       whites.append(b);
       this.keys.set(midi, b);
@@ -165,10 +183,10 @@ export class Keyboard {
     }
   }
 
-  private play(midi: number): void {
+  private play(midi: number, hold: boolean): void {
     this.active = midi;
     this.renderActive();
-    this.onPlay(midi);
+    this.onPlay(midi, hold);
     const m = this.model;
     if (!m) return;
     const T = m.tensionFor(midi);
@@ -205,6 +223,7 @@ export class Keyboard {
     }
     if (index < 0) return;
     e.preventDefault();
-    this.play(this.model.start + index);
+    this.heldCode = e.code;
+    this.play(this.model.start + index, true);
   }
 }

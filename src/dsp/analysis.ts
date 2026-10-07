@@ -86,16 +86,50 @@ export function findPeaks(s: Spectrum, threshold: number, fLow = 0, fHigh = Infi
 }
 
 /**
- * Independent estimate of the fundamental: the lowest spectral peak within `rangeDb` of the
- * strongest peak (above 15 Hz). It does not use any predicted frequency.
+ * How far a peak stands above the spectrum around it: its level minus the higher of the two
+ * minima found within half an octave on either side.
  */
-export function estimateFundamental(s: Spectrum, rangeDb = 45, minHz = 15): Peak | null {
+export function prominence(s: Spectrum, p: Peak): number {
+  const k = p.frequency / s.binHz;
+  const lo = Math.max(1, Math.floor(k / Math.SQRT2));
+  const hi = Math.min(s.db.length - 1, Math.ceil(k * Math.SQRT2));
+  const mid = Math.round(k);
+  let left = Infinity;
+  for (let m = lo; m <= mid; m++) left = Math.min(left, s.db[m]);
+  let right = Infinity;
+  for (let m = mid; m <= hi; m++) right = Math.min(right, s.db[m]);
+  return p.level - Math.max(left, right);
+}
+
+/**
+ * Independent estimate of the fundamental: the lowest spectral peak within `rangeDb` of the
+ * strongest peak (above 15 Hz) that also stands at least `minProminence` dB above its
+ * surroundings, so a small low-frequency bump (an attack transient, for instance) cannot be
+ * mistaken for it. It does not use any predicted frequency.
+ */
+export function estimateFundamental(
+  s: Spectrum,
+  rangeDb = 30,
+  minHz = 15,
+  minProminence = 20,
+): Peak | null {
   let maxDb = -Infinity;
   const lo = Math.max(1, Math.floor(minHz / s.binHz));
   for (let m = lo; m < s.db.length - 1; m++) if (s.db[m] > maxDb) maxDb = s.db[m];
   if (!Number.isFinite(maxDb) || maxDb <= DB_FLOOR) return null;
   const peaks = findPeaks(s, maxDb - rangeDb, minHz);
-  return peaks.length ? peaks[0] : null;
+  const prominent = peaks.filter((p) => prominence(s, p) >= minProminence);
+  // A fundamental heads a harmonic series: a strong peak sits near 2f or 3f (within 8 %, which
+  // also covers the stretched partials of very stiff strings), and the fundamental is not far
+  // weaker than that partial (a pickup next to the bridge costs it about 12 dB at most). Stray
+  // low-frequency bumps fail one test or the other.
+  const headsSeries = (p: Peak) =>
+    prominent.some(
+      (q) =>
+        q.level - p.level <= 25 &&
+        [2, 3].some((h) => Math.abs(q.frequency / (h * p.frequency) - 1) < 0.08),
+    );
+  return prominent.find(headsSeries) ?? prominent[0] ?? peaks[0] ?? null;
 }
 
 export interface MeasuredPartial {

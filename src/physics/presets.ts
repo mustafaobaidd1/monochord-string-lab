@@ -3,6 +3,7 @@
  * note, and derives sigma_0 and sigma_1 from two decay times (Bilbao's two-frequency fit).
  * Numbers and their sources are listed in the README ("Presets").
  */
+import { BOW_SHARPNESS, type BowSpec } from './bow.ts';
 import type { HammerSpec } from './excitation.ts';
 import {
   deriveString,
@@ -13,7 +14,7 @@ import {
 } from './materials.ts';
 import { lossFromT60 } from './theory.ts';
 
-export type ExcitationKind = 'pluck' | 'strike';
+export type ExcitationKind = 'pluck' | 'strike' | 'bow';
 
 export interface PluckSettings {
   /** Distance of the pluck point from the bridge, as a fraction of the length. */
@@ -37,6 +38,15 @@ export interface StrikeSettings {
   velocity: number;
   /** Contact width, m. */
   width: number;
+}
+
+export interface BowSettings {
+  /** Distance of the bow from the bridge, as a fraction of the length (beta). */
+  fromBridge: number;
+  /** Bow force relative to the string's calibrated playable force (1 = middle of the range). */
+  pressure: number;
+  /** Bow speed, m/s. */
+  velocity: number;
 }
 
 export interface Preset {
@@ -63,6 +73,11 @@ export interface Preset {
   excitation: ExcitationKind;
   pluck: PluckSettings;
   strike: StrikeSettings;
+  /**
+   * Bow force (N) that gives clean Helmholtz motion for this string with the bow at L/10 moving
+   * at 0.1 m/s, found by simulation (tests/bow.test.ts checks it).
+   */
+  bowForce: number;
   /** Pickup position as a fraction of the length from the bridge. */
   pickupFromBridge: number;
   /** Names of the two terminations, left (x = 0) and right (x = L). */
@@ -97,6 +112,7 @@ export const PRESETS: readonly Preset[] = [
     excitation: 'pluck',
     pluck: { fromBridge: 0.2, width: 0.004, amplitude: 0.0025 },
     strike: { ...mallet, mass: 0.004 },
+    bowForce: 1.4,
     pickupFromBridge: 0.1,
     ends: { left: 'Nut', right: 'Bridge' },
   },
@@ -115,6 +131,7 @@ export const PRESETS: readonly Preset[] = [
     excitation: 'pluck',
     pluck: { fromBridge: 0.2, width: 0.003, amplitude: 0.0015 },
     strike: { ...mallet, mass: 0.002 },
+    bowForce: 0.12,
     pickupFromBridge: 0.1,
     ends: { left: 'Nut', right: 'Bridge' },
   },
@@ -133,6 +150,7 @@ export const PRESETS: readonly Preset[] = [
     excitation: 'pluck',
     pluck: { fromBridge: 0.17, width: 0.009, amplitude: 0.002 },
     strike: { ...mallet, mass: 0.002, q0: 15 },
+    bowForce: 0.16,
     pickupFromBridge: 0.1,
     ends: { left: 'Nut', right: 'Saddle' },
   },
@@ -155,6 +173,7 @@ export const PRESETS: readonly Preset[] = [
     excitation: 'pluck',
     pluck: { fromBridge: 0.15, width: 0.01, amplitude: 0.003 },
     strike: { ...mallet, mass: 0.008 },
+    bowForce: 4.2,
     pickupFromBridge: 0.12,
     ends: { left: 'Nut', right: 'Bridge' },
   },
@@ -185,6 +204,7 @@ export const PRESETS: readonly Preset[] = [
       velocity: 2.5,
       width: 0.02,
     },
+    bowForce: 27,
     pickupFromBridge: 0.1,
     ends: { left: 'Agraffe', right: 'Bridge' },
   },
@@ -203,6 +223,7 @@ export const PRESETS: readonly Preset[] = [
     excitation: 'pluck',
     pluck: { fromBridge: 0.5, width: 0.012, amplitude: 0.003 },
     strike: { ...mallet },
+    bowForce: 0.75,
     pickupFromBridge: 0.1,
     ends: { left: 'Neck', right: 'Soundboard' },
   },
@@ -221,6 +242,7 @@ export const PRESETS: readonly Preset[] = [
     excitation: 'pluck',
     pluck: { fromBridge: 0.2, width: 0.008, amplitude: 0.0015 },
     strike: { ...mallet, mass: 0.002 },
+    bowForce: 0.17,
     pickupFromBridge: 0.1,
     ends: { left: 'Nut', right: 'Bridge' },
   },
@@ -271,5 +293,30 @@ export function hammerSpec(s: StrikeSettings): HammerSpec {
     exponent: s.exponent,
     velocity: s.velocity,
     width: s.width,
+  };
+}
+
+/** Reference speed and position at which the presets' bow forces were calibrated. */
+export const BOW_REFERENCE = { velocity: 0.1, fromBridge: 0.1 };
+
+/**
+ * Bow force in the middle of the playable range for the current string: the preset's calibrated
+ * force, scaled with the string impedance Z0 = sqrt(T mu) as Z0^1.3 (between Schelleng's Z0^2
+ * lower and Z0 upper limits) and in proportion to the bow speed.
+ */
+export function playableBowForce(preset: Preset, params: StringParams, velocity: number): number {
+  const ref = presetString(preset);
+  const zRef = Math.sqrt(ref.tension * deriveString(ref).mu);
+  const z = Math.sqrt(params.tension * deriveString(params).mu);
+  return preset.bowForce * (z / zRef) ** 1.3 * (velocity / BOW_REFERENCE.velocity);
+}
+
+export function bowSpec(preset: Preset, params: StringParams, b: BowSettings): BowSpec {
+  return {
+    position: 1 - b.fromBridge,
+    force: playableBowForce(preset, params, b.velocity) * b.pressure,
+    velocity: b.velocity,
+    width: 0.004,
+    sharpness: BOW_SHARPNESS,
   };
 }

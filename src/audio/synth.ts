@@ -3,6 +3,7 @@
  * physical string, with a few overlapping voices so that a new note can start while the previous
  * one is damped (as a finger would), plus a master stage with volume, mute and a soft limiter.
  */
+import type { BowSpec } from '../physics/bow.ts';
 import type { HammerSpec, PluckSpec } from '../physics/excitation.ts';
 import type { StringParams } from '../physics/materials.ts';
 import { Voice, type OutputSettings } from '../physics/voice.ts';
@@ -12,6 +13,8 @@ export type SynthCommand =
   | { type: 'hold'; id: number; params: StringParams; spec: PluckSpec; output: OutputSettings }
   | { type: 'release'; id: number }
   | { type: 'strike'; params: StringParams; spec: HammerSpec; output: OutputSettings }
+  | { type: 'bow'; id: number; params: StringParams; spec: BowSpec; output: OutputSettings }
+  | { type: 'bowRelease'; id: number }
   | { type: 'mute' }
   | { type: 'output'; output: OutputSettings }
   | { type: 'master'; volume: number; muted: boolean };
@@ -20,7 +23,7 @@ export type SynthCommand =
 export interface OnsetInfo {
   /** Sample index (in the synth's own clock) of the first sample of free vibration. */
   frame: number;
-  kind: 'pluck' | 'strike';
+  kind: 'pluck' | 'strike' | 'bow';
   N: number;
 }
 
@@ -66,6 +69,7 @@ export class StringSynth {
   frame = 0;
   private current = -1;
   private holdId = -1;
+  private bowId = -1;
   private output: OutputSettings = { kind: 'bridge', pickup: 0.8 };
   readonly master: MasterStage;
   /** Called when a voice starts free vibration (after a pluck release or a strike). */
@@ -154,6 +158,20 @@ export class StringSynth {
         this.holdId = -1;
         this.output = cmd.output;
         this.onOnset?.({ frame: this.frame, kind: 'strike', N: v.grid?.N ?? 0 });
+        break;
+      }
+      case 'bow': {
+        const v = this.takeVoice();
+        v.bowStart(cmd.params, cmd.spec, cmd.output);
+        this.holdId = -1;
+        this.bowId = cmd.id;
+        this.output = cmd.output;
+        this.onOnset?.({ frame: this.frame, kind: 'bow', N: v.grid?.N ?? 0 });
+        break;
+      }
+      case 'bowRelease': {
+        const lead = this.lead;
+        if (lead && lead.bow && this.bowId === cmd.id) lead.releaseBow();
         break;
       }
       case 'mute':
