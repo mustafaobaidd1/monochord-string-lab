@@ -260,7 +260,7 @@ function placeHint(): void {
     stringView.baselineY -
     (band.getBoundingClientRect().top - $('stage').getBoundingClientRect().top);
   if (x > 0) band.style.setProperty('--hint-x', `${x}px`);
-  band.style.setProperty('--hint-y', `${Math.max(0, y - 70)}px`);
+  band.style.setProperty('--hint-y', `${Math.max(0, y - 96)}px`);
   $('stage-hint').classList.toggle('stage-hint--right', x < band.clientWidth * 0.42);
 }
 

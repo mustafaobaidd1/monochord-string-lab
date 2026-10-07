@@ -28,7 +28,7 @@ try {
     await page.goto(url);
     await page.waitForSelector('html[data-ready="true"]', { timeout: 30_000 });
     // Give animations and simulations a moment to reach a representative frame.
-    await page.waitForTimeout(Number(process.env.SHOT_DELAY ?? 2500));
+    await page.waitForTimeout(Number(process.env.SHOT_DELAY ?? 1200));
     await page.screenshot({ path: shot.file });
     await page.close();
     console.log(`saved ${shot.file}`);
