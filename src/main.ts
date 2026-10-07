@@ -28,6 +28,7 @@ import { MATERIALS, linearDensity, tensionForFrequency } from './physics/materia
 import { hammerSpec, pluckSpec, presetById } from './physics/presets.ts';
 import { Controls } from './ui/controls.ts';
 import { Keyboard } from './ui/keyboard.ts';
+import { noteReadout, renderStretch, renderTension, type TensionModel } from './ui/charts.ts';
 import { renderPartials } from './ui/partials.ts';
 import { SpectrumView } from './ui/spectrum-view.ts';
 import { StringView } from './ui/string-view.ts';
@@ -200,6 +201,30 @@ function render(): void {
   $('stage').classList.toggle('stage--paused', state.paused);
   stringDirty = true;
   renderSoundPill();
+  renderStretchChart();
+}
+
+function renderStretchChart(): void {
+  const { physics, grid } = stringInfo(state.string, engine.sampleRate);
+  // Bars follow the sliders live. Dots are the last measurement, shown only while it still
+  // belongs to the current string (a slider being dragged makes it stale until the re-pluck).
+  const same = (a: number, b: number) =>
+    Math.abs(a - b) <= 1e-9 * Math.max(Math.abs(a), Math.abs(b), 1e-12);
+  const current =
+    snapshot &&
+    prediction &&
+    snapshot.tag === prediction.tag &&
+    same(prediction.f0, physics.f0) &&
+    same(prediction.B, physics.B)
+      ? snapshot
+      : null;
+  const worst = renderStretch($('stretch-chart'), physics.f0, physics.B, current);
+  const note = $('stretch-note');
+  if (worst == null) note.textContent = 'Dots show the measured partials after each pluck.';
+  else if (worst <= -1)
+    note.textContent = `Dots below the bars are the scheme's numerical dispersion: with N = ${grid?.N ?? '?'} grid intervals, partials come out up to ${Math.abs(worst).toFixed(1)} ¢ flat.`;
+  else
+    note.textContent = `Measured partials (dots) match the prediction within ${Math.abs(worst).toFixed(1)} ¢.`;
 }
 
 /** Keeps the "drag the string" hint just above the string at the excitation point. */
@@ -257,13 +282,19 @@ function updateKeyboard(): void {
   const start = 12 * Math.round((home - 12) / 12);
   const s = state.string;
   const mu = linearDensity(s);
-  keyboard.setModel({
+  tensionModel = {
     start,
     home,
     tensionFor: (midi) => tensionForFrequency(mu, s.length, midiToFrequency(midi)),
     breakingLoad: stringInfo(s, engine.sampleRate).physics.breakingLoad,
-  });
+  };
+  keyboard.setModel(tensionModel);
+  renderTension($('tension-chart'), tensionModel, null);
+  $('note-readout').innerHTML =
+    '<span class="readout-hint">Play a key: the string is retuned and plucked.</span>';
 }
+
+let tensionModel: TensionModel | null = null;
 
 function playNote(midi: number): void {
   void engine.start();
@@ -271,6 +302,10 @@ function playNote(midi: number): void {
   s.tension = tensionForFrequency(linearDensity(s), s.length, midiToFrequency(midi));
   update({ string: s, customised: true });
   excite();
+  if (tensionModel) {
+    renderTension($('tension-chart'), tensionModel, midi);
+    $('note-readout').innerHTML = noteReadout(midi, s.tension, tensionModel.breakingLoad);
+  }
 }
 
 function moveExcitePoint(delta: number): void {
@@ -445,6 +480,7 @@ function onSnapshot(s: Snapshot): void {
   snapshot = s;
   spectrumView.setSnapshot(s.spectrum);
   renderPartials($('partials-body'), prediction, s);
+  renderStretchChart();
   const out = $('f0-readout');
   out.removeAttribute('data-state');
   out.dataset.count = String(Number(out.dataset.count ?? 0) + 1);

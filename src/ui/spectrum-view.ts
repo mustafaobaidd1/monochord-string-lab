@@ -112,7 +112,7 @@ export class SpectrumView {
 
   /** For each device-pixel column, the range of spectrum bins it covers. */
   private columns(l: Layout, binHz: number, length: number, scale: number): ColumnMap {
-    const width = Math.round((l.w - l.left - l.right) * scale);
+    const width = Math.max(1, Math.round((l.w - l.left - l.right) * scale));
     const key = `${binHz}|${length}|${width}|${l.left}`;
     let map = this.columnCache.get(key);
     if (map) return map;
@@ -135,7 +135,7 @@ export class SpectrumView {
   /** Waterfall: one new row (dB spectrum of the most recent hop). */
   addRow(db: Float64Array, binHz: number): void {
     const l = this.layout;
-    if (!l) return;
+    if (!l || l.w - l.left - l.right < 40) return;
     const W = this.waterfall.width;
     const H = this.waterfall.height;
     if (W === 0 || H === 0) return;
@@ -170,6 +170,8 @@ export class SpectrumView {
 
   draw(): void {
     const l = this.computeLayout();
+    // A collapsed or transient layout (for example mid-resize) has nothing sensible to draw.
+    if (l.w - l.left - l.right < 40 || l.wfH < 10 || l.specH < 20) return;
     const resized =
       !this.layout || this.layout.w !== l.w || this.layout.h !== l.h || this.layout.dpr !== l.dpr;
     this.layout = l;

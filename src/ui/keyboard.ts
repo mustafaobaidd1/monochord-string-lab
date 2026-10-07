@@ -175,7 +175,7 @@ export class Keyboard {
     this.note.textContent =
       T > m.breakingLoad
         ? `${noteName(midi)} needs ${sig3(T)} N, beyond the ≈${sig3(m.breakingLoad)} N breaking load: a real string of this gauge would snap. That is why instruments use a different gauge for each note.`
-        : `${noteName(midi)}: tension ${sig3(T)} N (${Math.round((T / m.breakingLoad) * 100)} % of the breaking load).`;
+        : '';
   }
 
   private renderActive(): void {

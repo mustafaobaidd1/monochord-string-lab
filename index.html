@@ -247,6 +247,22 @@
             A stiff string resists bending, which raises high partials more than low ones. Push B
             towards 10⁻² and the tone turns bell-like.
           </p>
+          <figure class="mini-chart">
+            <figcaption>
+              <span>Cents above <i>n</i>·<i>f</i><sub>0</sub>, partials 1–20</span>
+              <span class="mini-key"
+                ><span class="swatch swatch--bar" aria-hidden="true"></span>theory
+                <span class="swatch swatch--dot" aria-hidden="true"></span>measured</span
+              >
+            </figcaption>
+            <div
+              class="mini-plot"
+              id="stretch-chart"
+              role="img"
+              aria-label="Stretch of the partials"
+            ></div>
+            <p class="mini-note" id="stretch-note"></p>
+          </figure>
           <div class="field" data-param="string.sigma0"></div>
           <div class="field" data-param="string.sigma1"></div>
           <p class="tip" id="t60-readout"></p>
@@ -317,7 +333,23 @@
               <button type="button" id="octave-up" aria-label="Upper octave">›</button>
             </div>
           </header>
-          <div class="keyboard" id="keyboard" role="group" aria-label="Keyboard"></div>
+          <div class="play-grid">
+            <div class="keyboard" id="keyboard" role="group" aria-label="Keyboard"></div>
+            <aside class="play-side" aria-label="Last note">
+              <p class="readout" id="note-readout" aria-live="polite">
+                <span class="readout-hint">Play a key: the string is retuned and plucked.</span>
+              </p>
+              <figure class="mini-chart">
+                <figcaption><span>Tension each key needs, T = μ(2Lf)²</span></figcaption>
+                <div
+                  class="mini-plot"
+                  id="tension-chart"
+                  role="img"
+                  aria-label="Tension per key"
+                ></div>
+              </figure>
+            </aside>
+          </div>
           <p class="note" id="keyboard-note"></p>
         </section>
       </div>
