@@ -162,8 +162,8 @@ const decay = (() => {
   const measured = -num / den / 2;
   return {
     sigma0,
-    measured: round(measured, 5),
-    relError: round(Math.abs(measured - sigma0) / sigma0, 6),
+    measured: round(measured, 6),
+    relError: Math.abs(measured - sigma0) / sigma0,
   };
 })();
 
@@ -241,7 +241,7 @@ md.push(
   `| Lossless energy drift over 1 s (all presets) | 0 (machine precision) | max ${Math.max(...energy.map((e) => e.drift)).toExponential(1)} |`,
 );
 md.push(
-  `| Energy decay with σ₀ = ${decay.sigma0} s⁻¹ | e^(−2σ₀t) | σ₀ measured ${decay.measured} s⁻¹ (error ${(decay.relError * 100).toFixed(4)} %) |`,
+  `| Energy decay with σ₀ = ${decay.sigma0} s⁻¹ | e^(−2σ₀t) | σ₀ measured ${decay.measured} s⁻¹ (relative error ${decay.relError.toExponential(1)}) |`,
 );
 md.push(
   `| Presets over 2 s | bounded; λ² + 4ν² + 4σ₁k/h² ≤ 1 | ${stability.map((s) => `${s.preset} ${s.stabilityNumber}`).join(', ')}; max displacement ≤ ${Math.max(...stability.map((s) => s.maxOverInitial))}× the pluck |`,

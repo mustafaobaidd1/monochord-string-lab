@@ -40,7 +40,7 @@ function validationTable(): string {
     `<tr><td>Lossless energy, 1 s, all presets</td><td>conserved</td><td>max relative drift ${exp(Math.max(...r.energy.map((e) => e.drift)))}</td><td>machine precision</td></tr>`,
   );
   rows.push(
-    `<tr><td>Energy decay with σ₀ = ${r.decay.sigma0} s⁻¹</td><td>${t('E \\propto e^{-2\\sigma_0 t}')}</td><td>σ₀ = ${r.decay.measured} s⁻¹</td><td>0.5 %</td></tr>`,
+    `<tr><td>Energy decay with σ₀ = ${r.decay.sigma0} s⁻¹</td><td>${t('E \\propto e^{-2\\sigma_0 t}')}</td><td>σ₀ = ${r.decay.measured} s⁻¹ (relative error ${exp(r.decay.relError)})</td><td>0.5 %</td></tr>`,
   );
   rows.push(
     `<tr><td>All presets for 2 s</td><td>${t('\\lambda^2 + 4\\nu^2 + 4\\sigma_1 k/h^2 \\le 1')}</td><td>${Math.min(...r.stability.map((s) => s.stabilityNumber))}–${Math.max(...r.stability.map((s) => s.stabilityNumber))}; displacement never exceeds the pluck</td><td>bounded</td></tr>`,
